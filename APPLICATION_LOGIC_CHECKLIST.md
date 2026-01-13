@@ -3,6 +3,8 @@
 ## 📋 Table of Contents
 1. [Authentication & User Management](#authentication--user-management)
 2. [Role-Based Access Control (RBAC)](#role-based-access-control-rbac)
+
+
 3. [Company Settings & Branding](#company-settings--branding)
 4. [Notifications System](#notifications-system)
 5. [Inventory Management](#inventory-management)
