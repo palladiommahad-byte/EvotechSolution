@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export localStorage Data - Morocco Inventory Hub</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .warning strong {
+            color: #856404;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none;
+        }
+        .success.show {
+            display: block;
+        }
+        .data-preview {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Export localStorage Data</h1>
+        <p class="subtitle">Morocco Inventory Hub - Data Backup Tool</p>
+        
+        <div class="warning">
+            <strong>⚠️ Important:</strong> This will export ALL data from your browser's localStorage. 
+            Make sure you're logged into the correct account and save this file in a safe location!
+        </div>
+        
+        <button onclick="exportData()">Export All Data</button>
+        <button onclick="previewData()">Preview Data</button>
+        
+        <div id="success" class="success">
+            ✅ Data exported successfully! Check your Downloads folder.
+        </div>
+        
+        <div id="preview" class="data-preview" style="display: none;"></div>
+    </div>
+
+    <script>
+        function getAllLocalStorageData() {
+            const dataToExport = {
+                // Authentication
+                auth_user: localStorage.getItem('auth_user'),
+                isAuthenticated: localStorage.getItem('isAuthenticated'),
+                teamUsers: localStorage.getItem('teamUsers'),
+                
+                // Company & Settings
+                companyInfo: localStorage.getItem('companyInfo'),
+                theme: localStorage.getItem('theme'),
+                
+                // Warehouses
+                warehouses: localStorage.getItem('warehouses'),
+                activeWarehouse: localStorage.getItem('activeWarehouse'),
+                
+                // Contacts (CRM)
+                crm_clients: localStorage.getItem('crm_clients'),
+                crm_suppliers: localStorage.getItem('crm_suppliers'),
+                
+                // Products & Inventory
+                products: localStorage.getItem('products'),
+                
+                // Sales Documents
+                salesInvoices: localStorage.getItem('salesInvoices'),
+                salesEstimates: localStorage.getItem('salesEstimates'),
+                salesDeliveryNotes: localStorage.getItem('salesDeliveryNotes'),
+                salesCreditNotes: localStorage.getItem('salesCreditNotes'),
+                salesStatements: localStorage.getItem('salesStatements'),
+                salesDivers: localStorage.getItem('salesDivers'),
+                
+                // Purchase Documents
+                purchaseOrders: localStorage.getItem('purchaseOrders'),
+                purchaseInvoices: localStorage.getItem('purchaseInvoices'),
+                purchaseDeliveryNotes: localStorage.getItem('purchaseDeliveryNotes'),
+                purchaseStatements: localStorage.getItem('purchaseStatements'),
+                
+                // Invoicing Documents
+                invoices: localStorage.getItem('invoices'),
+                estimates: localStorage.getItem('estimates'),
+                purchaseOrdersInv: localStorage.getItem('purchaseOrdersInv'),
+                deliveryNotesInv: localStorage.getItem('deliveryNotesInv'),
+                statementsInv: localStorage.getItem('statementsInv'),
+                
+                // Treasury
+                treasury_bankAccounts: localStorage.getItem('treasury_bankAccounts'),
+                treasury_warehouseCash: localStorage.getItem('treasury_warehouseCash'),
+                treasury_salesPayments: localStorage.getItem('treasury_salesPayments'),
+                treasury_purchasePayments: localStorage.getItem('treasury_purchasePayments'),
+                
+                // Notifications
+                notifications: localStorage.getItem('notifications'),
+                
+                // Export metadata
+                exportedAt: new Date().toISOString(),
+                exportedBy: 'localStorage-export-tool',
+                version: '1.0.0'
+            };
+            
+            return dataToExport;
+        }
+        
+        function exportData() {
+            try {
+                const dataToExport = getAllLocalStorageData();
+                
+                // Create downloadable JSON file
+                const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const dateStr = new Date().toISOString().split('T')[0];
+                a.download = `morocco-inventory-backup-${dateStr}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // Show success message
+                const successDiv = document.getElementById('success');
+                successDiv.classList.add('show');
+                setTimeout(() => successDiv.classList.remove('show'), 5000);
+                
+                console.log('✅ Data exported successfully!', dataToExport);
+            } catch (error) {
+                alert('Error exporting data: ' + error.message);
+                console.error('Export error:', error);
+            }
+        }
+        
+        function previewData() {
+            const dataToExport = getAllLocalStorageData();
+            const previewDiv = document.getElementById('preview');
+            
+            // Count non-null items
+            const count = Object.values(dataToExport).filter(v => v !== null).length;
+            const total = Object.keys(dataToExport).length;
+            
+            previewDiv.innerHTML = `
+                <strong>Data Summary:</strong><br>
+                Keys with data: ${count} / ${total}<br><br>
+                <strong>Preview (first 1000 chars):</strong><br>
+                ${JSON.stringify(dataToExport, null, 2).substring(0, 1000)}...
+            `;
+            previewDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
