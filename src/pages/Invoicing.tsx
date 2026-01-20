@@ -50,9 +50,13 @@ import { cn } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatMAD, VAT_RATE, calculateInvoiceTotals } from '@/lib/moroccan-utils';
 import { ProductSearch } from '@/components/ui/product-search';
-import { mockProducts, Product } from '@/lib/products';
+import { Product } from '@/lib/products';
+import { useProducts } from '@/contexts/ProductsContext';
 import { CurrencyDisplay } from '@/components/ui/CurrencyDisplay';
 import { useContacts, Contact } from '@/contexts/ContactsContext';
+import { useSales } from '@/contexts/SalesContext';
+import { usePurchases } from '@/contexts/PurchasesContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { useToast } from '@/hooks/use-toast';
 import { generateDocumentNumber } from '@/lib/document-number-generator';
 import {
@@ -96,46 +100,84 @@ interface InvoiceDocument {
   dueDate?: string;
 }
 
-const initialFactures: InvoiceDocument[] = [
-  { id: 'FAC-2024-001', client: 'Atlas Industries', date: '2024-01-15', items: 8, total: 245000, status: 'paid', type: 'invoice', paymentMethod: 'bank_transfer' },
-  { id: 'FAC-2024-002', client: 'Sahara Trading', date: '2024-01-14', items: 3, total: 67000, status: 'pending', type: 'invoice', paymentMethod: 'cash' },
-  { id: 'FAC-2024-003', client: 'Rabat Machines', date: '2024-01-11', items: 10, total: 278000, status: 'overdue', type: 'invoice', paymentMethod: 'check' },
-  { id: 'FAC-2024-004', client: 'Casablanca Steel', date: '2024-01-10', items: 6, total: 156000, status: 'paid', type: 'invoice', paymentMethod: 'cash' },
-];
-
-const initialEstimates: InvoiceDocument[] = [
-  { id: 'EST-2024-001', client: 'Medina Electronics', date: '2024-01-13', items: 15, total: 389000, status: 'sent', type: 'estimate' },
-  { id: 'EST-2024-002', client: 'Oujda Materials', date: '2024-01-10', items: 5, total: 120000, status: 'draft', type: 'estimate' },
-  { id: 'EST-2024-003', client: 'Tanger Import Export', date: '2024-01-08', items: 12, total: 267000, status: 'sent', type: 'estimate' },
-];
-
-const initialPurchaseOrders: InvoiceDocument[] = [
-  { id: 'PO-2024-001', supplier: 'Tanger Import Export', date: '2024-01-15', items: 12, total: 156000, status: 'received', type: 'purchase_order' },
-  { id: 'PO-2024-002', supplier: 'Fès Machinery', date: '2024-01-14', items: 5, total: 89000, status: 'shipped', type: 'purchase_order' },
-  { id: 'PO-2024-003', supplier: 'Rabat Components', date: '2024-01-13', items: 28, total: 234000, status: 'pending', type: 'purchase_order' },
-];
-
-const initialDeliveryNotes: InvoiceDocument[] = [
-  { id: 'DN-2024-001', client: 'Atlas Industries', date: '2024-01-15', items: 8, total: 245000, status: 'delivered', type: 'delivery_note' },
-  { id: 'DN-2024-002', client: 'Sahara Trading', date: '2024-01-14', items: 3, total: 67000, status: 'in_transit', type: 'delivery_note' },
-  { id: 'DN-2024-003', client: 'Casablanca Steel', date: '2024-01-12', items: 6, total: 156000, status: 'delivered', type: 'delivery_note' },
-];
-
-const initialStatements: InvoiceDocument[] = [
-  { id: 'ST-2024-001', client: 'Atlas Industries', date: '2024-01-08', items: 0, total: 245000, status: 'current', type: 'statement' },
-  { id: 'ST-2024-002', client: 'Rabat Machines', date: '2024-01-07', items: 0, total: 278000, status: 'overdue', type: 'statement' },
-  { id: 'ST-2024-003', client: 'Sahara Trading', date: '2024-01-06', items: 0, total: 67000, status: 'current', type: 'statement' },
-];
+// Mock data removed - all data now comes from database
 
 export const Invoicing = () => {
   const { t } = useTranslation();
   const { clients, suppliers, getClientById, getSupplierById } = useContacts();
+  const { products = [] } = useProducts();
+  const { companyInfo } = useCompany();
   const { toast } = useToast();
-  const [mockFactures, setMockFactures] = useState<InvoiceDocument[]>(initialFactures);
-  const [mockEstimates, setMockEstimates] = useState<InvoiceDocument[]>(initialEstimates);
-  const [mockPurchaseOrders, setMockPurchaseOrders] = useState<InvoiceDocument[]>(initialPurchaseOrders);
-  const [mockDeliveryNotes, setMockDeliveryNotes] = useState<InvoiceDocument[]>(initialDeliveryNotes);
-  const [mockStatements, setMockStatements] = useState<InvoiceDocument[]>(initialStatements);
+  
+  // Use contexts for real data
+  const {
+    invoices,
+    estimates,
+    deliveryNotes,
+    divers,
+    isLoading: isLoadingSales,
+    deleteInvoice,
+    updateInvoice,
+    createInvoice,
+    deleteEstimate,
+    updateEstimate,
+    createEstimate,
+    deleteDeliveryNote,
+    updateDeliveryNote,
+    createDeliveryNote,
+    deleteDivers,
+    updateDivers,
+    createDivers,
+  } = useSales();
+  
+  const {
+    purchaseOrders,
+    purchaseInvoices,
+    isLoading: isLoadingPurchases,
+    deletePurchaseOrder,
+    updatePurchaseOrder,
+    createPurchaseOrder,
+    deletePurchaseInvoice,
+    updatePurchaseInvoice,
+    createPurchaseInvoice,
+  } = usePurchases();
+  
+  // Convert SalesDocument to InvoiceDocument format for compatibility
+  const convertToInvoiceDocument = (doc: any): InvoiceDocument => ({
+    id: doc.id || doc.documentId,
+    client: doc.client,
+    clientData: doc.clientData,
+    date: doc.date,
+    items: doc.items,
+    total: doc.total,
+    status: doc.status,
+    type: doc.type === 'divers' ? 'delivery_note' : doc.type,
+    paymentMethod: doc.paymentMethod,
+    note: doc.note,
+    dueDate: doc.dueDate,
+  });
+  
+  // Convert PurchaseDocument to InvoiceDocument format
+  const convertPurchaseToInvoiceDocument = (doc: any): InvoiceDocument => ({
+    id: doc.id || doc.documentId,
+    supplier: doc.supplier,
+    supplierData: doc.supplierData,
+    date: doc.date,
+    items: doc.items,
+    total: doc.total || doc.subtotal,
+    status: doc.status,
+    type: doc.type === 'purchase_order' ? 'purchase_order' : 'invoice',
+    paymentMethod: doc.paymentMethod,
+    note: doc.note,
+    dueDate: doc.dueDate,
+  });
+  
+  // Map context data to InvoiceDocument format
+  const mockFactures = invoices.map(convertToInvoiceDocument);
+  const mockEstimates = estimates.map(convertToInvoiceDocument);
+  const mockDeliveryNotes = [...deliveryNotes, ...divers].map(convertToInvoiceDocument);
+  const mockPurchaseOrders = purchaseOrders.map(convertPurchaseToInvoiceDocument);
+  const mockStatements: InvoiceDocument[] = []; // Statements not implemented yet
   const [documentType, setDocumentType] = useState<'invoice' | 'estimate' | 'purchase_order' | 'delivery_note' | 'statement'>('invoice');
   const [activeTab, setActiveTab] = useState<'invoice' | 'estimate' | 'purchase_order' | 'delivery_note' | 'statement'>('invoice');
   const [items, setItems] = useState<InvoiceItem[]>([
@@ -177,7 +219,7 @@ export const Invoicing = () => {
     setDeletingDocument(doc);
   };
 
-  const confirmDeleteDocument = () => {
+  const confirmDeleteDocument = async () => {
     if (!deletingDocument) return;
 
     const documentTypeNames: Record<string, string> = {
@@ -188,43 +230,60 @@ export const Invoicing = () => {
       'statement': 'Statement',
     };
 
-    const deleteFromList = (docs: InvoiceDocument[]) => docs.filter(d => d.id !== deletingDocument.id);
+    try {
+      switch (activeTab) {
+        case 'invoice':
+          await deleteInvoice(deletingDocument.id);
+          break;
+        case 'estimate':
+          await deleteEstimate(deletingDocument.id);
+          break;
+        case 'purchase_order':
+          await deletePurchaseOrder(deletingDocument.id);
+          break;
+        case 'delivery_note':
+          // Check if it's a divers or delivery_note
+          const isDivers = divers.some(d => d.id === deletingDocument.id);
+          if (isDivers) {
+            await deleteDivers(deletingDocument.id);
+          } else {
+            await deleteDeliveryNote(deletingDocument.id);
+          }
+          break;
+        case 'statement':
+          // Statements not implemented yet
+          toast({
+            title: "Not Supported",
+            description: "Statement deletion is not yet implemented.",
+            variant: "destructive",
+          });
+          return;
+      }
 
-    switch (activeTab) {
-      case 'invoice':
-        setMockFactures(deleteFromList(mockFactures));
-        break;
-      case 'estimate':
-        setMockEstimates(deleteFromList(mockEstimates));
-        break;
-      case 'purchase_order':
-        setMockPurchaseOrders(deleteFromList(mockPurchaseOrders));
-        break;
-      case 'delivery_note':
-        setMockDeliveryNotes(deleteFromList(mockDeliveryNotes));
-        break;
-      case 'statement':
-        setMockStatements(deleteFromList(mockStatements));
-        break;
+      setSelectedDocuments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(deletingDocument.id);
+        return newSet;
+      });
+      
+      const docTypeName = documentTypeNames[deletingDocument.type] || 'Document';
+      setDeletingDocument(null);
+      
+      toast({
+        title: "Document Deleted",
+        description: `${docTypeName} "${deletingDocument.id}" has been deleted successfully.`,
+        variant: "destructive",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to delete document: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
     }
-
-    setSelectedDocuments(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(deletingDocument.id);
-      return newSet;
-    });
-    
-    const docTypeName = documentTypeNames[deletingDocument.type] || 'Document';
-    setDeletingDocument(null);
-    
-    toast({
-      title: "Document Deleted",
-      description: `${docTypeName} "${deletingDocument.id}" has been deleted successfully.`,
-      variant: "destructive",
-    });
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedDocuments.size === 0) return;
 
     const documentTypeNames: Record<string, string> = {
@@ -235,35 +294,70 @@ export const Invoicing = () => {
       'statement': 'Statements',
     };
 
-    const deleteFromList = (docs: InvoiceDocument[]) => docs.filter(d => !selectedDocuments.has(d.id));
+    const selectedIds = Array.from(selectedDocuments);
+    let successCount = 0;
+    let errorCount = 0;
 
-    switch (activeTab) {
-      case 'invoice':
-        setMockFactures(deleteFromList(mockFactures));
-        break;
-      case 'estimate':
-        setMockEstimates(deleteFromList(mockEstimates));
-        break;
-      case 'purchase_order':
-        setMockPurchaseOrders(deleteFromList(mockPurchaseOrders));
-        break;
-      case 'delivery_note':
-        setMockDeliveryNotes(deleteFromList(mockDeliveryNotes));
-        break;
-      case 'statement':
-        setMockStatements(deleteFromList(mockStatements));
-        break;
+    try {
+      for (const id of selectedIds) {
+        try {
+          switch (activeTab) {
+            case 'invoice':
+              await deleteInvoice(id);
+              successCount++;
+              break;
+            case 'estimate':
+              await deleteEstimate(id);
+              successCount++;
+              break;
+            case 'purchase_order':
+              await deletePurchaseOrder(id);
+              successCount++;
+              break;
+            case 'delivery_note':
+              const isDivers = divers.some(d => d.id === id);
+              if (isDivers) {
+                await deleteDivers(id);
+              } else {
+                await deleteDeliveryNote(id);
+              }
+              successCount++;
+              break;
+            case 'statement':
+              // Statements not implemented
+              errorCount++;
+              break;
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`Failed to delete ${id}:`, error);
+        }
+      }
+
+      const count = successCount;
+      const docTypeName = documentTypeNames[activeTab] || 'Documents';
+      setSelectedDocuments(new Set());
+      
+      if (successCount > 0) {
+        toast({
+          title: "Documents Deleted",
+          description: `${count} ${docTypeName} have been deleted successfully.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`,
+          variant: errorCount > 0 ? "default" : "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to delete documents.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to delete documents: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
     }
-
-    const count = selectedDocuments.size;
-    const docTypeName = documentTypeNames[activeTab] || 'Documents';
-    setSelectedDocuments(new Set());
-    
-    toast({
-      title: "Documents Deleted",
-      description: `${count} ${docTypeName} have been deleted successfully.`,
-      variant: "destructive",
-    });
   };
 
   const handleDownloadPDF = async (doc: InvoiceDocument & { items?: any }) => {
@@ -301,16 +395,16 @@ export const Invoicing = () => {
 
       switch (docType) {
         case 'invoice':
-          await generateInvoicePDF(docWithItems as any);
+          await generateInvoicePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'estimate':
-          await generateEstimatePDF(docWithItems as any);
+          await generateEstimatePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'purchase_order':
-          await generatePurchaseOrderPDF(docWithItems as any);
+          await generatePurchaseOrderPDF({ ...docWithItems as any, companyInfo });
           break;
         case 'delivery_note':
-          await generateDeliveryNotePDF(docWithItems as any);
+          await generateDeliveryNotePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'statement':
           generateStatementPDF(doc);
@@ -358,39 +452,11 @@ export const Invoicing = () => {
       const { pdf } = await import('@react-pdf/renderer');
       const React = await import('react');
       const { DocumentPDFTemplate } = await import('@/components/documents/DocumentPDFTemplate');
-      const { createMockItems } = await import('@/lib/pdf-template-generator');
-
       const items = Array.isArray(docWithItems.items) 
         ? docWithItems.items 
-        : createMockItems(typeof docWithItems.items === 'number' ? docWithItems.items : 0, docWithItems.total);
+        : []; // Use actual items from document, no mock items
 
-      // Get company info
-      const savedCompanyInfo = localStorage.getItem('companyInfo');
-      const defaultCompanyInfo = {
-        name: 'EVOTECH Solutions SARL',
-        legalForm: 'SARL',
-        email: 'contact@evotech.ma',
-        phone: '+212 5 24 45 67 89',
-        address: 'Zone Industrielle, Lot 123, Marrakech 40000, Morocco',
-        ice: '001234567890123',
-        ifNumber: '12345678',
-        rc: '123456 - Marrakech',
-        tp: '12345678',
-        cnss: '1234567',
-        logo: null,
-        footerText: 'Merci pour votre confiance. Paiement à 30 jours. TVA 20%.',
-      };
-      
-      let companyInfo;
-      try {
-        companyInfo = savedCompanyInfo 
-          ? { ...defaultCompanyInfo, ...JSON.parse(savedCompanyInfo) }
-          : defaultCompanyInfo;
-      } catch (e) {
-        companyInfo = defaultCompanyInfo;
-      }
-
-      // Create PDF document
+      // Create PDF document using company info from context
       const pdfDoc = React.createElement(DocumentPDFTemplate, {
         type: docType as any,
         documentId: docWithItems.id,
@@ -493,32 +559,58 @@ export const Invoicing = () => {
     });
   };
 
-  const handleSaveDocument = () => {
+  const handleSaveDocument = async () => {
     if (!editingDocument) return;
 
-    const updateDocument = (docs: InvoiceDocument[]) =>
-      docs.map(d => d.id === editingDocument.id ? { ...d, ...editFormData } as InvoiceDocument : d);
+    try {
+      const updateData = {
+        date: editFormData.date,
+        status: editFormData.status,
+        paymentMethod: editFormData.paymentMethod,
+        note: editFormData.note,
+        dueDate: editFormData.dueDate,
+      };
 
-    switch (activeTab) {
-      case 'invoice':
-        setMockFactures(updateDocument(mockFactures));
-        break;
-      case 'estimate':
-        setMockEstimates(updateDocument(mockEstimates));
-        break;
-      case 'purchase_order':
-        setMockPurchaseOrders(updateDocument(mockPurchaseOrders));
-        break;
-      case 'delivery_note':
-        setMockDeliveryNotes(updateDocument(mockDeliveryNotes));
-        break;
-      case 'statement':
-        setMockStatements(updateDocument(mockStatements));
-        break;
+      switch (activeTab) {
+        case 'invoice':
+          await updateInvoice(editingDocument.id, updateData);
+          break;
+        case 'estimate':
+          await updateEstimate(editingDocument.id, updateData);
+          break;
+        case 'purchase_order':
+          await updatePurchaseOrder(editingDocument.id, updateData);
+          break;
+        case 'delivery_note':
+          const isDivers = divers.some(d => d.id === editingDocument.id);
+          if (isDivers) {
+            await updateDivers(editingDocument.id, updateData);
+          } else {
+            await updateDeliveryNote(editingDocument.id, updateData);
+          }
+          break;
+        case 'statement':
+          toast({
+            title: "Not Supported",
+            description: "Statement updates are not yet implemented.",
+            variant: "default",
+          });
+          return;
+      }
+
+      setEditingDocument(null);
+      setEditFormData({});
+      toast({
+        title: "Document Updated",
+        description: "Document has been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to update document: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
     }
-
-    setEditingDocument(null);
-    setEditFormData({});
   };
 
   const addItem = () => {
@@ -569,9 +661,13 @@ export const Invoicing = () => {
 
   const totals = calculateInvoiceTotals(items);
 
-  const handleCreateDocument = () => {
+  const handleCreateDocument = async () => {
     if (items.length === 0 || items.every(item => !item.description || item.quantity === 0 || item.unitPrice === 0)) {
-      alert('Please add at least one valid line item before creating the document.');
+      toast({
+        title: "Validation Error",
+        description: 'Please add at least one valid line item before creating the document.',
+        variant: "destructive",
+      });
       return;
     }
 
@@ -579,7 +675,11 @@ export const Invoicing = () => {
     const entityId = isPurchase ? formSupplier : formClient;
     
     if (!entityId) {
-      alert(`Please select a ${isPurchase ? 'supplier' : 'client'}.`);
+      toast({
+        title: "Validation Error",
+        description: `Please select a ${isPurchase ? 'supplier' : 'client'}.`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -588,65 +688,96 @@ export const Invoicing = () => {
       ? getSupplierById(entityId) 
       : getClientById(entityId);
 
-    // Generate unique document number
-    const allExistingDocuments = [
-      ...mockFactures,
-      ...mockEstimates,
-      ...mockPurchaseOrders,
-      ...mockDeliveryNotes,
-      ...mockStatements,
-    ];
-    
-    const documentNumber = generateDocumentNumber(
-      documentType === 'invoice' ? 'invoice' :
-      documentType === 'estimate' ? 'estimate' :
-      documentType === 'purchase_order' ? 'purchase_order' :
-      documentType === 'delivery_note' ? 'delivery_note' :
-      'statement',
-      allExistingDocuments,
-      formDate
-    );
-
-    const newDocument: InvoiceDocument = {
-      id: documentNumber,
-      [isPurchase ? 'supplier' : 'client']: contactData?.company || contactData?.name || entityId,
-      [isPurchase ? 'supplierData' : 'clientData']: contactData,
-      date: formDate,
-      items: items, // Store the actual items array with descriptions
-      total: documentType === 'invoice' || documentType === 'estimate' ? totals.total : totals.subtotal,
-      status: 'draft',
-      type: documentType,
-      paymentMethod: documentType === 'invoice' ? formPaymentMethod : undefined,
-      note: formNote || undefined,
-      dueDate: formDueDate || undefined,
-    };
-
-    switch (activeTab) {
-      case 'invoice':
-        setMockFactures([...mockFactures, newDocument]);
-        break;
-      case 'estimate':
-        setMockEstimates([...mockEstimates, newDocument]);
-        break;
-      case 'purchase_order':
-        setMockPurchaseOrders([...mockPurchaseOrders, newDocument]);
-        break;
-      case 'delivery_note':
-        setMockDeliveryNotes([...mockDeliveryNotes, newDocument]);
-        break;
-      case 'statement':
-        setMockStatements([...mockStatements, newDocument]);
-        break;
+    // Generate unique document number using database function
+    // This ensures uniqueness by checking the database directly
+    let documentNumber: string;
+    try {
+      const { generateDocumentNumberFromDB } = await import('@/lib/document-number-service');
+      documentNumber = await generateDocumentNumberFromDB(
+        documentType === 'invoice' ? 'invoice' :
+        documentType === 'estimate' ? 'estimate' :
+        documentType === 'purchase_order' ? 'purchase_order' :
+        documentType === 'delivery_note' ? 'delivery_note' :
+        'statement',
+        formDate
+      );
+    } catch (error) {
+      console.warn('Failed to generate document number from database, using fallback:', error);
+      // Fallback to client-side generation if database function fails
+      const allExistingDocuments = [
+        ...mockFactures,
+        ...mockEstimates,
+        ...mockPurchaseOrders,
+        ...mockDeliveryNotes,
+        ...mockStatements,
+      ];
+      documentNumber = generateDocumentNumber(
+        documentType === 'invoice' ? 'invoice' :
+        documentType === 'estimate' ? 'estimate' :
+        documentType === 'purchase_order' ? 'purchase_order' :
+        documentType === 'delivery_note' ? 'delivery_note' :
+        'statement',
+        allExistingDocuments,
+        formDate
+      );
     }
 
-    // Reset form
-    setItems([{ id: '1', description: '', quantity: 1, unitPrice: 0, total: 0 }]);
-    setFormClient('');
-    setFormSupplier('');
-    setFormDate(new Date().toISOString().split('T')[0]);
-    setFormPaymentMethod('cash');
-    setFormNote('');
-    setFormDueDate('');
+    try {
+      const documentData = {
+        client: isPurchase ? undefined : entityId,
+        supplier: isPurchase ? entityId : undefined,
+        date: formDate,
+        items: items,
+        total: documentType === 'invoice' || documentType === 'estimate' ? totals.total : totals.subtotal,
+        subtotal: totals.subtotal,
+        status: 'draft',
+        paymentMethod: documentType === 'invoice' ? formPaymentMethod : undefined,
+        note: formNote || undefined,
+        dueDate: formDueDate || undefined,
+      };
+
+      switch (activeTab) {
+        case 'invoice':
+          await createInvoice(documentData);
+          break;
+        case 'estimate':
+          await createEstimate(documentData);
+          break;
+        case 'purchase_order':
+          await createPurchaseOrder(documentData);
+          break;
+        case 'delivery_note':
+          await createDeliveryNote(documentData);
+          break;
+        case 'statement':
+          toast({
+            title: "Not Supported",
+            description: "Statement creation is not yet implemented.",
+            variant: "default",
+          });
+          return;
+      }
+
+      // Reset form
+      setItems([{ id: '1', description: '', quantity: 1, unitPrice: 0, total: 0 }]);
+      setFormClient('');
+      setFormSupplier('');
+      setFormDate(new Date().toISOString().split('T')[0]);
+      setFormPaymentMethod('cash');
+      setFormNote('');
+      setFormDueDate('');
+      
+      toast({
+        title: "Document Created",
+        description: "Document has been created successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to create document: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
     
     toast({
       title: t('documents.documentCreated', { defaultValue: 'Document Created' }),
@@ -778,30 +909,45 @@ export const Invoicing = () => {
     }
   };
 
-  const handleStatusChange = (docId: string, newStatus: string, docType: string) => {
-    const updateDocument = (docs: InvoiceDocument[], setDocs: React.Dispatch<React.SetStateAction<InvoiceDocument[]>>) => {
-      const updated = docs.map(doc => 
-        doc.id === docId ? { ...doc, status: newStatus } : doc
-      );
-      setDocs(updated);
-    };
-
-    switch (docType) {
-      case 'invoice':
-        updateDocument(mockFactures, setMockFactures);
-        break;
-      case 'estimate':
-        updateDocument(mockEstimates, setMockEstimates);
-        break;
-      case 'purchase_order':
-        updateDocument(mockPurchaseOrders, setMockPurchaseOrders);
-        break;
-      case 'delivery_note':
-        updateDocument(mockDeliveryNotes, setMockDeliveryNotes);
-        break;
-      case 'statement':
-        updateDocument(mockStatements, setMockStatements);
-        break;
+  const handleStatusChange = async (docId: string, newStatus: string, docType: string) => {
+    try {
+      switch (docType) {
+        case 'invoice':
+          await updateInvoice(docId, { status: newStatus });
+          break;
+        case 'estimate':
+          await updateEstimate(docId, { status: newStatus });
+          break;
+        case 'purchase_order':
+          await updatePurchaseOrder(docId, { status: newStatus });
+          break;
+        case 'delivery_note':
+          const isDivers = divers.some(d => d.id === docId);
+          if (isDivers) {
+            await updateDivers(docId, { status: newStatus });
+          } else {
+            await updateDeliveryNote(docId, { status: newStatus });
+          }
+          break;
+        case 'statement':
+          toast({
+            title: "Not Supported",
+            description: "Statement status updates are not yet implemented.",
+            variant: "default",
+          });
+          return;
+      }
+      
+      toast({
+        title: "Status Updated",
+        description: "Document status has been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to update status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -989,7 +1135,7 @@ export const Invoicing = () => {
                     <div className="col-span-5">
                       <Label className="text-xs font-medium mb-1.5 block">Product (Optional)</Label>
                       <ProductSearch
-                        products={mockProducts}
+                                products={products}
                         value={item.productId}
                         onSelect={(product) => handleProductSelect(item.id, product)}
                         placeholder="Search product..."

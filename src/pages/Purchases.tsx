@@ -50,10 +50,12 @@ import { cn } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatMAD, VAT_RATE, calculateInvoiceTotals } from '@/lib/moroccan-utils';
 import { ProductSearch } from '@/components/ui/product-search';
-import { mockProducts, Product } from '@/lib/products';
+import { Product } from '@/lib/products';
+import { useProducts } from '@/contexts/ProductsContext';
 import { CurrencyDisplay } from '@/components/ui/CurrencyDisplay';
 import { useContacts, UIContact } from '@/contexts/ContactsContext';
 import { usePurchases, PurchaseDocument, PurchaseItem } from '@/contexts/PurchasesContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { useToast } from '@/hooks/use-toast';
 import { generateDocumentNumber } from '@/lib/document-number-generator';
 import {
@@ -73,15 +75,13 @@ import {
 
 // PurchaseItem and PurchaseDocument interfaces are imported from PurchasesContext
 
-// Mock statements data (no database table yet)
-const initialStatements: PurchaseDocument[] = [
-  { id: 'ST-2024-001', documentId: 'ST-2024-001', supplier: 'Fès Machinery', date: '2024-01-08', items: [], total: 234000, status: 'current', type: 'statement' },
-  { id: 'ST-2024-002', documentId: 'ST-2024-002', supplier: 'Tanger Import Export', date: '2024-01-07', items: [], total: 156000, status: 'overdue', type: 'statement' },
-];
+// Mock data removed - all data now comes from database via PurchasesContext
 
 export const Purchases = () => {
   const { t } = useTranslation();
   const { suppliers, getSupplierById } = useContacts();
+  const { products = [] } = useProducts();
+  const { companyInfo } = useCompany();
   const { toast } = useToast();
   const {
     purchaseOrders,
@@ -99,8 +99,7 @@ export const Purchases = () => {
     deleteDeliveryNote,
   } = usePurchases();
   
-  // Keep statements as mock data for now (no database table yet)
-  const [mockStatements, setMockStatements] = useState<PurchaseDocument[]>(initialStatements);
+  // Statements feature removed - no database table yet
   const [documentType, setDocumentType] = useState<'purchase_order' | 'delivery_note' | 'invoice' | 'statement'>('purchase_order');
   const [activeTab, setActiveTab] = useState<'purchase_order' | 'delivery_note' | 'invoice' | 'statement'>('purchase_order');
   const [items, setItems] = useState<PurchaseItem[]>([
@@ -129,7 +128,7 @@ export const Purchases = () => {
       case 'invoice':
         return purchaseInvoices;
       case 'statement':
-        return mockStatements;
+        return []; // Statements not implemented yet
       default:
         return [];
     }
@@ -172,8 +171,8 @@ export const Purchases = () => {
           await deletePurchaseInvoice(deletingDocument.id);
           break;
         case 'statement':
-          // Statements are mock data
-          setMockStatements(prev => prev.filter(d => d.id !== deletingDocument.id));
+          // Statements feature not implemented
+          break;
           break;
       }
 
@@ -218,8 +217,8 @@ export const Purchases = () => {
               await deletePurchaseInvoice(doc.id);
               break;
             case 'statement':
-              // Statements are mock data
-              setMockStatements(prev => prev.filter(d => d.id !== doc.id));
+              // Statements feature not implemented
+              break;
               break;
           }
         })
@@ -274,8 +273,8 @@ export const Purchases = () => {
           await updatePurchaseInvoice(editingDocument.id, updateData);
           break;
         case 'statement':
-          // Statements are mock data
-          setMockStatements(prev => prev.map(d => d.id === editingDocument.id ? { ...d, ...editFormData } as PurchaseDocument : d));
+          // Statements feature not implemented
+          break;
           break;
       }
 
@@ -321,13 +320,13 @@ export const Purchases = () => {
 
       switch (docType) {
         case 'purchase_order':
-          await generatePurchaseOrderPDF(docWithItems as any);
+          await generatePurchaseOrderPDF({ ...docWithItems as any, companyInfo });
           break;
         case 'delivery_note':
-          await generateDeliveryNotePDF(docWithItems as any);
+          await generateDeliveryNotePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'invoice':
-          await generateInvoicePDF(docWithItems as any);
+          await generateInvoicePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'statement':
           generateStatementPDF(doc);
@@ -378,39 +377,11 @@ export const Purchases = () => {
       const { pdf } = await import('@react-pdf/renderer');
       const React = await import('react');
       const { DocumentPDFTemplate } = await import('@/components/documents/DocumentPDFTemplate');
-      const { createMockItems } = await import('@/lib/pdf-template-generator');
-
       const items = Array.isArray(docWithItems.items) 
         ? docWithItems.items 
-        : createMockItems(typeof docWithItems.items === 'number' ? docWithItems.items : 0, docWithItems.total);
+        : []; // Use actual items from document, no mock items
 
-      // Get company info
-      const savedCompanyInfo = localStorage.getItem('companyInfo');
-      const defaultCompanyInfo = {
-        name: 'EVOTECH Solutions SARL',
-        legalForm: 'SARL',
-        email: 'contact@evotech.ma',
-        phone: '+212 5 24 45 67 89',
-        address: 'Zone Industrielle, Lot 123, Marrakech 40000, Morocco',
-        ice: '001234567890123',
-        ifNumber: '12345678',
-        rc: '123456 - Marrakech',
-        tp: '12345678',
-        cnss: '1234567',
-        logo: null,
-        footerText: 'Merci pour votre confiance. Paiement à 30 jours. TVA 20%.',
-      };
-      
-      let companyInfo;
-      try {
-        companyInfo = savedCompanyInfo 
-          ? { ...defaultCompanyInfo, ...JSON.parse(savedCompanyInfo) }
-          : defaultCompanyInfo;
-      } catch (e) {
-        companyInfo = defaultCompanyInfo;
-      }
-
-      // Create PDF document
+      // Create PDF document using company info from context
       const pdfDoc = React.createElement(DocumentPDFTemplate, {
         type: docType as any,
         documentId: docWithItems.id,
@@ -613,7 +584,6 @@ export const Purchases = () => {
         ...purchaseOrders,
         ...deliveryNotes,
         ...purchaseInvoices,
-        ...mockStatements,
       ];
       documentNumber = generateDocumentNumber(
         documentType === 'invoice' ? 'purchase_invoice' :
@@ -675,30 +645,13 @@ export const Purchases = () => {
           await createPurchaseInvoice(newDocumentData);
           break;
         case 'statement':
-          // Statements are mock data
-          const newStatement: PurchaseDocument = {
-            id: documentNumber,
-            documentId: documentNumber,
-            supplier: supplierData.company || supplierData.name || formSupplier,
-            supplierData: {
-              id: supplierData.id,
-              name: supplierData.name,
-              company: supplierData.company || '',
-              email: supplierData.email || '',
-              phone: supplierData.phone || '',
-              ice: supplierData.ice || null,
-              if_number: supplierData.ifNumber || null,
-              rc: supplierData.rc || null,
-            },
-            date: formDate,
-            items: items,
-            total: documentTotal,
-            status: 'draft',
-            type: 'statement',
-            note: formNote || undefined,
-          };
-          setMockStatements([...mockStatements, newStatement]);
-          break;
+          // Statements feature not implemented yet
+          toast({
+            title: "Feature Not Available",
+            description: "Statements feature is not yet implemented.",
+            variant: "destructive",
+          });
+          return;
       }
 
       // Reset form
@@ -856,10 +809,7 @@ export const Purchases = () => {
           await updatePurchaseInvoice(docId, updateData);
           break;
         case 'statement':
-          // Statements are mock data
-          setMockStatements(prev => prev.map(doc => 
-            doc.id === docId ? { ...doc, status: newStatus } : doc
-          ));
+          // Statements feature not implemented
           break;
       }
     } catch (error) {
@@ -1143,7 +1093,7 @@ export const Purchases = () => {
                             <div className="col-span-5">
                               <Label className="text-xs font-medium mb-1.5 block">{t('inventory.productName')} ({t('common.optional')})</Label>
                               <ProductSearch
-                                products={mockProducts}
+                                products={products}
                                 value={item.productId}
                                 onSelect={(product) => handleProductSelect(item.id, product)}
                                 placeholder={t('common.search')}
@@ -1511,7 +1461,7 @@ export const Purchases = () => {
                             <div className="col-span-3 min-w-0">
                               <Label className="text-xs font-medium mb-1.5 block">{t('documents.productOptional')}</Label>
                               <ProductSearch
-                                products={mockProducts}
+                                products={products}
                                 value={item.productId}
                                 onSelect={(product) => handleProductSelect(item.id, product)}
                                 placeholder={t('documents.searchProduct')}
@@ -1886,7 +1836,7 @@ export const Purchases = () => {
                             <div className="col-span-3">
                               <Label className="text-xs">{t('documents.productOptional')}</Label>
                               <ProductSearch
-                                products={mockProducts}
+                                products={products}
                                 value={item.productId}
                                 onSelect={(product) => handleProductSelect(item.id, product)}
                                 placeholder={t('documents.searchProduct')}

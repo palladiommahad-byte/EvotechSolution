@@ -47,21 +47,6 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Convert database settings to CompanyInfo format
   const companyInfo: CompanyInfo = useMemo(() => {
     if (!dbSettings) {
-      // Fallback to localStorage if database is not available
-      if (typeof window !== 'undefined') {
-        try {
-          const saved = localStorage.getItem('companyInfo');
-          if (saved) {
-            try {
-              return { ...defaultCompanyInfo, ...JSON.parse(saved) };
-            } catch {
-              return defaultCompanyInfo;
-            }
-          }
-        } catch (error) {
-          console.warn('Error loading company info from localStorage:', error);
-        }
-      }
       return defaultCompanyInfo;
     }
 
@@ -80,17 +65,6 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
       footerText: dbSettings.footer_text || defaultCompanyInfo.footerText,
     };
   }, [dbSettings]);
-
-  // Sync to localStorage as backup
-  useEffect(() => {
-    if (typeof window !== 'undefined' && dbSettings) {
-      try {
-        localStorage.setItem('companyInfo', JSON.stringify(companyInfo));
-      } catch (error) {
-        console.warn('Error saving company info to localStorage:', error);
-      }
-    }
-  }, [companyInfo, dbSettings]);
 
   const updateCompanyInfo = async (info: Partial<CompanyInfo>) => {
     // Convert CompanyInfo format to database format
@@ -111,16 +85,6 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     try {
       await updateMutation.mutateAsync(dbUpdate);
-      
-      // Also update localStorage as backup
-      if (typeof window !== 'undefined') {
-        const updated = { ...companyInfo, ...info };
-        try {
-          localStorage.setItem('companyInfo', JSON.stringify(updated));
-        } catch (error) {
-          console.warn('Error saving company info to localStorage:', error);
-        }
-      }
     } catch (error) {
       console.error('Error updating company info:', error);
       throw error;

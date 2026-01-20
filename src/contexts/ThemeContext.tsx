@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useAuth } from './AuthContext';
+import { useUserPreferences, useUpdateUserPreferences } from '@/hooks/useSettings';
 
 export type ThemeColor = 'navy' | 'indigo' | 'blue' | 'sky' | 'teal' | 'slate' | 'rose' | 'cyan' | 'yellow';
 
@@ -73,22 +75,33 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// Helper function to validate UUID format
+const isValidUUID = (str: string | undefined | null): boolean => {
+  if (!str) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  // Initialize theme from localStorage first (before auth is available)
+  const { user } = useAuth();
+  const userId = user?.id && isValidUUID(user.id) ? user.id : '';
+  const { data: userPreferences } = useUserPreferences(userId);
+  const updatePreferencesMutation = useUpdateUserPreferences();
+  
+  // Initialize theme from database user preferences, fallback to 'navy'
   const [currentTheme, setCurrentTheme] = useState<ThemeColor>(() => {
-    if (typeof window === 'undefined') {
-      return 'navy';
-    }
-    try {
-      const saved = localStorage.getItem('app-theme-color');
-      if (saved && Object.keys(themeColors).includes(saved)) {
-        return saved as ThemeColor;
-      }
-    } catch (error) {
-      console.warn('Error loading theme from localStorage:', error);
+    if (userPreferences?.theme_color && Object.keys(themeColors).includes(userPreferences.theme_color)) {
+      return userPreferences.theme_color as ThemeColor;
     }
     return 'navy';
   });
+
+  // Update theme when user preferences change
+  useEffect(() => {
+    if (userPreferences?.theme_color && Object.keys(themeColors).includes(userPreferences.theme_color)) {
+      setCurrentTheme(userPreferences.theme_color as ThemeColor);
+    }
+  }, [userPreferences?.theme_color]);
 
   // Apply theme styles immediately
   useEffect(() => {
@@ -102,19 +115,22 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     root.style.setProperty('--sidebar-primary', config.primary);
     root.style.setProperty('--sidebar-primary-foreground', config.primaryForeground);
     root.style.setProperty('--sidebar-ring', config.primary);
-    
-    // Save to localStorage as backup
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('app-theme-color', currentTheme);
-      } catch (error) {
-        console.warn('Error saving theme to localStorage:', error);
-      }
-    }
   }, [currentTheme]);
 
-  const setTheme = (theme: ThemeColor) => {
+  const setTheme = async (theme: ThemeColor) => {
     setCurrentTheme(theme);
+    
+    // Save to database if user is logged in
+    if (userId) {
+      try {
+        await updatePreferencesMutation.mutateAsync({
+          userId,
+          preferences: { theme_color: theme },
+        });
+      } catch (error) {
+        console.error('Error updating theme in database:', error);
+      }
+    }
   };
 
   return (

@@ -1,7 +1,23 @@
 import jsPDF from 'jspdf';
 import { formatMADFull, InvoiceItem } from './moroccan-utils';
-import { generatePDFFromTemplate, createMockItems } from './pdf-template-generator';
+import { generatePDFFromTemplate, createFallbackItems } from './pdf-template-generator';
 import i18n from '@/i18n/config';
+
+// CompanyInfo type for PDF generation
+interface CompanyInfo {
+  name: string;
+  legalForm: string;
+  email: string;
+  phone: string;
+  address: string;
+  ice: string;
+  ifNumber: string;
+  rc: string;
+  tp: string;
+  cnss: string;
+  logo?: string | null;
+  footerText?: string;
+}
 
 // Helper to add text with wrapping
 const addWrappedText = (doc: jsPDF, text: string, x: number, y: number, maxWidth: number, lineHeight: number = 5): number => {
@@ -25,10 +41,11 @@ export const generateInvoicePDF = async (document: {
   type?: string;
   dueDate?: string;
   note?: string;
+  companyInfo?: CompanyInfo;
 }) => {
   const items: InvoiceItem[] = Array.isArray(document.items) 
     ? document.items 
-    : createMockItems(document.items, document.total);
+    : createFallbackItems(document.items, document.total);
 
   await generatePDFFromTemplate({
     type: 'invoice',
@@ -43,6 +60,7 @@ export const generateInvoicePDF = async (document: {
     dueDate: document.dueDate,
     note: document.note,
     language: i18n.language || 'en',
+    companyInfo: document.companyInfo,
   });
 };
 
@@ -224,10 +242,11 @@ export const generatePurchaseOrderPDF = async (document: {
   total: number;
   status?: string;
   dueDate?: string;
+  companyInfo?: CompanyInfo;
 }) => {
   const items: InvoiceItem[] = Array.isArray(document.items) 
     ? document.items 
-    : createMockItems(document.items, document.total);
+    : createFallbackItems(document.items, document.total);
 
   await generatePDFFromTemplate({
     type: 'purchase_order',
@@ -240,6 +259,7 @@ export const generatePurchaseOrderPDF = async (document: {
     items,
     dueDate: document.dueDate,
     language: i18n.language || 'en',
+    companyInfo: document.companyInfo,
   });
 };
 
@@ -256,10 +276,11 @@ export const generateDeliveryNotePDF = async (document: {
   status?: string;
   dueDate?: string;
   note?: string;
+  companyInfo?: CompanyInfo;
 }) => {
   const items: InvoiceItem[] = Array.isArray(document.items) 
     ? document.items 
-    : createMockItems(document.items, document.total);
+    : createFallbackItems(document.items, document.total);
 
   await generatePDFFromTemplate({
     type: 'delivery_note',
@@ -273,6 +294,7 @@ export const generateDeliveryNotePDF = async (document: {
     dueDate: document.dueDate,
     note: document.note,
     language: i18n.language || 'en',
+    companyInfo: document.companyInfo,
   });
 };
 
@@ -289,10 +311,11 @@ export const generateEstimatePDF = async (document: {
   status?: string;
   dueDate?: string;
   note?: string;
+  companyInfo?: CompanyInfo;
 }) => {
   const items: InvoiceItem[] = Array.isArray(document.items) 
     ? document.items 
-    : createMockItems(document.items, document.total);
+    : createFallbackItems(document.items, document.total);
 
   await generatePDFFromTemplate({
     type: 'estimate',
@@ -306,6 +329,7 @@ export const generateEstimatePDF = async (document: {
     dueDate: document.dueDate,
     note: document.note,
     language: i18n.language || 'en',
+    companyInfo: document.companyInfo,
   });
 };
 

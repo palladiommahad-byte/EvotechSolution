@@ -1,5 +1,7 @@
 import React, { createContext, useContext, ReactNode, useCallback, useMemo } from 'react';
 import { treasuryService, BankAccount as ServiceBankAccount, TreasuryPayment } from '@/services/treasury.service';
+import { invoicesService } from '@/services/invoices.service';
+import { purchaseInvoicesService } from '@/services/purchase-invoices.service';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // UI-friendly interfaces (camelCase)
@@ -143,6 +145,20 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
   const { data: purchasePaymentsData = [], isLoading: isLoadingPurchasePayments } = useQuery({
     queryKey: ['treasury', 'payments', 'purchase'],
     queryFn: () => treasuryService.getAllPayments('purchase'),
+    staleTime: 30000,
+  });
+
+  // Fetch invoices for TVA calculation (only cleared payments)
+  const { data: invoicesData = [] } = useQuery({
+    queryKey: ['invoices', 'treasury', 'tva'],
+    queryFn: () => invoicesService.getAll(),
+    staleTime: 30000,
+  });
+
+  // Fetch purchase invoices for TVA calculation (only cleared payments)
+  const { data: purchaseInvoicesData = [] } = useQuery({
+    queryKey: ['purchase_invoices', 'treasury', 'tva'],
+    queryFn: () => purchaseInvoicesService.getAll(),
     staleTime: 30000,
   });
 
@@ -333,10 +349,36 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
     [totalBank, totalWarehouseCashValue]
   );
 
-  const VAT_RATE = 0.20;
-  const tvaReserve = useMemo(() => totalCashedSales * VAT_RATE, [totalCashedSales]);
-  const collectedTVA = useMemo(() => totalCashedSales * VAT_RATE, [totalCashedSales]);
-  const recoverableTVA = useMemo(() => totalSupplierBillsPaid * VAT_RATE, [totalSupplierBillsPaid]);
+  // Calculate TVA from actual invoice VAT amounts (only for cleared payments)
+  // Get cleared payment invoice numbers
+  const clearedSalesInvoiceNumbers = useMemo(
+    () => new Set(clearedSalesPayments.map(p => p.invoiceNumber)),
+    [clearedSalesPayments]
+  );
+  
+  const clearedPurchaseInvoiceNumbers = useMemo(
+    () => new Set(clearedPurchasePayments.map(p => p.invoiceNumber)),
+    [clearedPurchasePayments]
+  );
+
+  // Calculate collected TVA from sales invoices (only cleared payments)
+  const collectedTVA = useMemo(() => {
+    return invoicesData
+      .filter(inv => clearedSalesInvoiceNumbers.has(inv.document_id))
+      .reduce((sum, inv) => sum + (inv.vat_amount || 0), 0);
+  }, [invoicesData, clearedSalesInvoiceNumbers]);
+
+  // Calculate recoverable TVA from purchase invoices (only cleared payments)
+  const recoverableTVA = useMemo(() => {
+    return purchaseInvoicesData
+      .filter(inv => clearedPurchaseInvoiceNumbers.has(inv.document_id))
+      .reduce((sum, inv) => sum + (inv.vat_amount || 0), 0);
+  }, [purchaseInvoicesData, clearedPurchaseInvoiceNumbers]);
+
+  // TVA Reserve is the same as collected TVA (reserved for tax payment)
+  const tvaReserve = useMemo(() => collectedTVA, [collectedTVA]);
+
+  // Net TVA Due = Collected TVA - Recoverable TVA
   const netTVADue = useMemo(() => collectedTVA - recoverableTVA, [collectedTVA, recoverableTVA]);
 
   const expectedInflowPayments = useMemo(

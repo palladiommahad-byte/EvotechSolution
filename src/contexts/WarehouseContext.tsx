@@ -69,56 +69,14 @@ export const WarehouseProvider = ({ children }: { children: ReactNode }) => {
         email: w.email,
       }));
     }
-    
-    // Fallback to localStorage if database is not available
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('warehouses');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              return parsed;
-            }
-          } catch {
-            return initialWarehouses;
-          }
-        }
-      } catch (error) {
-        console.warn('Error loading warehouses from localStorage:', error);
-      }
-    }
     return initialWarehouses;
   }, [dbWarehouses]);
 
-  // Sync to localStorage as backup
-  useEffect(() => {
-    if (typeof window !== 'undefined' && warehouses.length > 0) {
-      try {
-        localStorage.setItem('warehouses', JSON.stringify(warehouses));
-      } catch (error) {
-        console.warn('Error saving warehouses to localStorage:', error);
-      }
-    }
-  }, [warehouses]);
-
-  // Initialize active warehouse from user preferences or localStorage
+  // Initialize active warehouse from user preferences
   const [activeWarehouse, setActiveWarehouseState] = useState<Warehouse>(() => {
     // First try user preferences
     if (userPreferences?.active_warehouse_id) {
       return userPreferences.active_warehouse_id;
-    }
-    
-    // Fallback to localStorage
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('activeWarehouse');
-        if (saved && saved !== 'all') {
-          return saved;
-        }
-      } catch (error) {
-        console.warn('Error loading active warehouse from localStorage:', error);
-      }
     }
     
     return warehouses.length > 0 ? warehouses[0].id : 'all';
@@ -159,18 +117,9 @@ export const WarehouseProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [warehouses]);
 
-  // Save active warehouse to user preferences and localStorage
+  // Save active warehouse to user preferences
   const setActiveWarehouse = async (warehouse: Warehouse) => {
     setActiveWarehouseState(warehouse);
-    
-    // Save to localStorage as backup
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('activeWarehouse', warehouse);
-      } catch (error) {
-        console.warn('Error saving active warehouse to localStorage:', error);
-      }
-    }
     
     // Save to user preferences if user is logged in with valid UUID
     if (user?.id && isValidUUID(user.id)) {
@@ -197,16 +146,6 @@ export const WarehouseProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Failed to create warehouse');
       }
       
-      // Also save to localStorage as backup
-      if (typeof window !== 'undefined') {
-        try {
-          const updated = [...warehouses, result];
-          localStorage.setItem('warehouses', JSON.stringify(updated));
-        } catch (error) {
-          console.warn('Error saving warehouse to localStorage:', error);
-        }
-      }
-      
       return {
         id: result.id,
         name: result.name,
@@ -224,16 +163,6 @@ export const WarehouseProvider = ({ children }: { children: ReactNode }) => {
   const updateWarehouse = async (id: string, updates: Partial<WarehouseInfo>) => {
     try {
       await updateMutation.mutateAsync({ id, warehouse: updates });
-      
-      // Also update localStorage as backup
-      if (typeof window !== 'undefined') {
-        try {
-          const updated = warehouses.map(w => w.id === id ? { ...w, ...updates } : w);
-          localStorage.setItem('warehouses', JSON.stringify(updated));
-        } catch (error) {
-          console.warn('Error saving warehouse to localStorage:', error);
-        }
-      }
     } catch (error) {
       console.error('Error updating warehouse:', error);
       throw error;
@@ -248,16 +177,6 @@ export const WarehouseProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       await deleteMutation.mutateAsync(id);
-      
-      // Also update localStorage as backup
-      if (typeof window !== 'undefined') {
-        try {
-          const updated = warehouses.filter(w => w.id !== id);
-          localStorage.setItem('warehouses', JSON.stringify(updated));
-        } catch (error) {
-          console.warn('Error saving warehouse to localStorage:', error);
-        }
-      }
       
       // If deleted warehouse was active, switch to first available
       if (activeWarehouse === id && warehouses.length > 1) {

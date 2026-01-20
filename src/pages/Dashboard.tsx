@@ -10,52 +10,112 @@ import { InventoryStatsCard } from '@/components/dashboard/InventoryStatsCard';
 import { useWarehouse } from '@/contexts/WarehouseContext';
 import { formatMAD } from '@/lib/moroccan-utils';
 import { useTranslation } from 'react-i18next';
+import { useDashboardData } from '@/hooks/useDashboardData';
 
 export const Dashboard = () => {
   const { t } = useTranslation();
   const { warehouseInfo, isAllWarehouses } = useWarehouse();
+  
+  // Fetch real data from database
+  const {
+    kpis,
+    salesComparison,
+    earningsComparison,
+    ordersComparison,
+    stockValue,
+    isLoading,
+  } = useDashboardData();
 
-  // Optimized KPI calculations with useMemo
+  // Calculate KPI data with real database values
   const kpiData = useMemo(() => {
-    // Mock data - in real app, this would come from API
-    const totalSales = 7520000;
-    const totalEarnings = 5240000; // Changed from negative to positive for better UX
-    const totalOrders = 25;
-    const totalStockValue = 115960000;
-    const previousPeriodSales = 6600000;
-    const previousPeriodEarnings = 4800000;
-    const previousPeriodOrders = 17;
+    if (isLoading) {
+      // Return loading state with zeros
+      return {
+        totalSales: {
+          value: formatMAD(0),
+          numericValue: 0,
+          change: 0,
+          label: t('dashboard.vsLastMonth')
+        },
+        totalEarnings: {
+          value: formatMAD(0),
+          numericValue: 0,
+          change: 0,
+          label: t('dashboard.vsLastMonth')
+        },
+        totalOrders: {
+          value: '0',
+          change: 0,
+          label: t('dashboard.newOrdersThisMonth')
+        },
+        totalStockValue: {
+          value: formatMAD(0),
+          numericValue: 0,
+          change: 0,
+          label: t('dashboard.totalInventoryValue')
+        }
+      };
+    }
 
-    const salesChange = ((totalSales - previousPeriodSales) / previousPeriodSales * 100).toFixed(1);
-    const earningsChange = ((totalEarnings - previousPeriodEarnings) / previousPeriodEarnings * 100).toFixed(1);
-    const ordersChange = ((totalOrders - previousPeriodOrders) / previousPeriodOrders * 100).toFixed(1);
+    const totalSales = parseFloat(kpis.total_sales || '0');
+    const totalEarnings = parseFloat(kpis.total_earnings || '0');
+    const totalOrders = parseInt(kpis.total_orders || '0');
+    const totalStockValueNum = typeof stockValue === 'number' ? stockValue : parseFloat(String(stockValue || '0'));
+
+    // Calculate percentage changes with type safety and missing data handling
+    const parseNumber = (val: any) => {
+      if (typeof val === "number") return val;
+      if (typeof val === "string") {
+        const n = parseFloat(val);
+        return isNaN(n) ? 0 : n;
+      }
+      return 0;
+    };
+
+    const salesPrev = parseNumber(salesComparison?.previous);
+    const salesCurr = parseNumber(salesComparison?.current);
+    const salesChange = salesPrev > 0
+      ? ((salesCurr - salesPrev) / salesPrev * 100)
+      : 0;
+
+    const earningsPrev = parseNumber(earningsComparison?.previous);
+    const earningsCurr = parseNumber(earningsComparison?.current);
+    const earningsChange = earningsPrev > 0
+      ? ((earningsCurr - earningsPrev) / earningsPrev * 100)
+      : 0;
+
+    const ordersPrev = parseNumber(ordersComparison?.previous);
+    const ordersCurr = parseNumber(ordersComparison?.current);
+    const ordersChange = ordersPrev > 0
+      ? ((ordersCurr - ordersPrev) / ordersPrev * 100)
+      : 0;
 
     return {
       totalSales: {
         value: formatMAD(totalSales),
         numericValue: totalSales,
-        change: parseFloat(salesChange),
+        change: parseFloat(salesChange.toFixed(1)),
         label: t('dashboard.vsLastMonth')
       },
       totalEarnings: {
         value: formatMAD(totalEarnings),
         numericValue: totalEarnings,
-        change: parseFloat(earningsChange),
+        change: parseFloat(earningsChange.toFixed(1)),
         label: t('dashboard.vsLastMonth')
       },
       totalOrders: {
         value: totalOrders.toString(),
-        change: parseFloat(ordersChange),
+        change: parseFloat(ordersChange.toFixed(1)),
         label: t('dashboard.newOrdersThisMonth')
       },
       totalStockValue: {
-        value: formatMAD(totalStockValue),
-        numericValue: totalStockValue,
+        value: formatMAD(totalStockValueNum),
+        numericValue: totalStockValueNum,
         change: 0,
         label: t('dashboard.totalInventoryValue')
       }
     };
-  }, []);
+  }, [kpis, salesComparison, earningsComparison, ordersComparison, stockValue, isLoading, t]);
 
   return (
     <div className="space-y-6 pb-6">

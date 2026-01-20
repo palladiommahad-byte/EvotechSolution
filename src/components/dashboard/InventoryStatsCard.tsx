@@ -1,20 +1,48 @@
 import { Package, TrendingUp, AlertTriangle, Box } from 'lucide-react';
 import { formatMAD } from '@/lib/moroccan-utils';
-
-// Mock inventory data - in real app, this would come from API
-const mockInventoryStats = {
-  totalProducts: 11,
-  totalCategories: 6,
-  totalStockValue: 115960000,
-  inStock: 7,
-  lowStock: 2,
-  outOfStock: 2,
-  totalUnits: 7412,
-};
+import { useProducts } from '@/contexts/ProductsContext';
+import { useMemo } from 'react';
 
 export const InventoryStatsCard = () => {
-  const stockStatusCount = mockInventoryStats.inStock + mockInventoryStats.lowStock + mockInventoryStats.outOfStock;
-  const inStockPercentage = ((mockInventoryStats.inStock / stockStatusCount) * 100).toFixed(0);
+  const { products, isLoading } = useProducts();
+
+  // Calculate inventory stats from real product data
+  const inventoryStats = useMemo(() => {
+    if (isLoading || products.length === 0) {
+      return {
+        totalProducts: 0,
+        totalCategories: 0,
+        totalStockValue: 0,
+        inStock: 0,
+        lowStock: 0,
+        outOfStock: 0,
+        totalUnits: 0,
+      };
+    }
+
+    const categories = new Set(products.map(p => p.category));
+    const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
+    const totalUnits = products.reduce((sum, p) => sum + p.stock, 0);
+    
+    const inStock = products.filter(p => p.status === 'in_stock').length;
+    const lowStock = products.filter(p => p.status === 'low_stock').length;
+    const outOfStock = products.filter(p => p.status === 'out_of_stock').length;
+
+    return {
+      totalProducts: products.length,
+      totalCategories: categories.size,
+      totalStockValue,
+      inStock,
+      lowStock,
+      outOfStock,
+      totalUnits,
+    };
+  }, [products, isLoading]);
+
+  const stockStatusCount = inventoryStats.inStock + inventoryStats.lowStock + inventoryStats.outOfStock;
+  const inStockPercentage = stockStatusCount > 0 
+    ? ((inventoryStats.inStock / stockStatusCount) * 100).toFixed(0)
+    : '0';
 
   return (
     <div className="card-elevated p-6 animate-slide-up">
@@ -37,14 +65,14 @@ export const InventoryStatsCard = () => {
             <Package className="w-4 h-4 text-primary" />
             <p className="text-xs font-medium text-muted-foreground">Total Products</p>
           </div>
-          <p className="text-2xl font-bold text-foreground">{mockInventoryStats.totalProducts}</p>
+          <p className="text-2xl font-bold text-foreground">{inventoryStats.totalProducts}</p>
         </div>
         <div className="p-4 bg-section rounded-lg border border-border/50">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="w-4 h-4 text-success" />
             <p className="text-xs font-medium text-muted-foreground">In Stock</p>
           </div>
-          <p className="text-2xl font-bold text-success">{mockInventoryStats.inStock}</p>
+          <p className="text-2xl font-bold text-success">{inventoryStats.inStock}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{inStockPercentage}% Available</p>
         </div>
       </div>
@@ -56,21 +84,21 @@ export const InventoryStatsCard = () => {
             <div className="w-2 h-2 rounded-full bg-success"></div>
             <span className="text-sm text-foreground">In Stock</span>
           </div>
-          <span className="text-sm font-semibold text-foreground">{mockInventoryStats.inStock}</span>
+          <span className="text-sm font-semibold text-foreground">{inventoryStats.inStock}</span>
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-warning"></div>
             <span className="text-sm text-foreground">Low Stock</span>
           </div>
-          <span className="text-sm font-semibold text-warning">{mockInventoryStats.lowStock}</span>
+          <span className="text-sm font-semibold text-warning">{inventoryStats.lowStock}</span>
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-destructive"></div>
             <span className="text-sm text-foreground">Out of Stock</span>
           </div>
-          <span className="text-sm font-semibold text-destructive">{mockInventoryStats.outOfStock}</span>
+          <span className="text-sm font-semibold text-destructive">{inventoryStats.outOfStock}</span>
         </div>
       </div>
 
@@ -78,11 +106,11 @@ export const InventoryStatsCard = () => {
       <div className="mt-6 pt-4 border-t border-border">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-muted-foreground">Total Stock Value</span>
-          <span className="text-lg font-bold text-foreground">{formatMAD(mockInventoryStats.totalStockValue)}</span>
+          <span className="text-lg font-bold text-foreground">{formatMAD(inventoryStats.totalStockValue)}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Total Units</span>
-          <span className="text-sm font-semibold text-foreground">{mockInventoryStats.totalUnits.toLocaleString()}</span>
+          <span className="text-sm font-semibold text-foreground">{inventoryStats.totalUnits.toLocaleString()}</span>
         </div>
       </div>
     </div>

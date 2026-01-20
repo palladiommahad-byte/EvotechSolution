@@ -501,4 +501,63 @@ export const treasuryService = {
       throw error;
     }
   },
+
+  /**
+   * Find payment by invoice number
+   */
+  async getPaymentByInvoiceNumber(invoiceNumber: string, paymentType: 'sales' | 'purchase'): Promise<TreasuryPayment | null> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('treasury_payments')
+        .select('*')
+        .eq('invoice_number', invoiceNumber)
+        .eq('payment_type', paymentType)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null;
+        console.error('Error fetching payment by invoice number:', error);
+        return null;
+      }
+
+      if (!data) return null;
+      return {
+        ...data,
+        invoiceId: data.invoice_id,
+        invoiceNumber: data.invoice_number,
+        paymentMethod: data.payment_method,
+        checkNumber: data.check_number,
+        maturityDate: data.maturity_date,
+        paymentType: data.payment_type,
+        date: data.payment_date || data.date,
+        warehouse: data.warehouse_id || data.warehouse,
+      } as TreasuryPayment;
+    } catch (error) {
+      console.error('Error fetching payment by invoice number:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Delete payment by invoice number
+   */
+  async deletePaymentByInvoiceNumber(invoiceNumber: string, paymentType: 'sales' | 'purchase'): Promise<void> {
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('treasury_payments')
+        .delete()
+        .eq('invoice_number', invoiceNumber)
+        .eq('payment_type', paymentType);
+
+      if (error) {
+        console.error('Error deleting payment by invoice number:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error deleting payment by invoice number:', error);
+      throw error;
+    }
+  },
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Wallet, 
   Building2, 
@@ -50,6 +50,8 @@ import { useContacts } from '@/contexts/ContactsContext';
 import { useTreasury } from '@/contexts/TreasuryContext';
 import { useToast } from '@/hooks/use-toast';
 import { invoicesService } from '@/services/invoices.service';
+import { purchaseOrdersService } from '@/services/purchase-orders.service';
+import { purchaseInvoicesService } from '@/services/purchase-invoices.service';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { Badge } from '@/components/ui/badge';
@@ -137,6 +139,26 @@ export const Treasury = () => {
   const { data: invoicesData = [] } = useQuery({
     queryKey: ['invoices', 'aging'],
     queryFn: () => invoicesService.getAll({ status: 'sent' }), // Get unpaid invoices
+    staleTime: 30000,
+  });
+
+  // Fetch all invoices for insights (recent invoices with tax breakdown)
+  const { data: allInvoicesData = [] } = useQuery({
+    queryKey: ['invoices', 'all'],
+    queryFn: () => invoicesService.getAll(),
+    staleTime: 30000,
+  });
+
+  // Fetch purchase orders and purchase invoices for insights
+  const { data: purchaseOrdersData = [] } = useQuery({
+    queryKey: ['purchases', 'purchase_orders', 'treasury'],
+    queryFn: () => purchaseOrdersService.getAll(),
+    staleTime: 30000,
+  });
+
+  const { data: purchaseInvoicesData = [] } = useQuery({
+    queryKey: ['purchases', 'purchase_invoices', 'treasury'],
+    queryFn: () => purchaseInvoicesService.getAll(),
     staleTime: 30000,
   });
 
@@ -236,8 +258,19 @@ export const Treasury = () => {
   // Filter bank statement data by date
   const filteredBankStatementData = bankStatementData.filter(entry => matchesDateFilter(entry.date));
 
+  // Create a set of existing invoice document IDs for validation
+  // Treasury payments store document_id (e.g., "INV-01/26/0002") as invoice_id
+  const existingInvoiceDocumentIds = useMemo(() => {
+    return new Set(allInvoicesData.map(inv => inv.document_id));
+  }, [allInvoicesData]);
+
   // Filter sales and purchase payments for display
+  // Only show payments that have a corresponding invoice in the database
   const filteredSalesPayments = salesPayments.filter(payment => {
+    // Validate that the invoice exists by checking document_id (invoice_number)
+    const invoiceExists = payment.invoiceNumber ? existingInvoiceDocumentIds.has(payment.invoiceNumber) : false;
+    if (!invoiceExists) return false;
+    
     const matchesSearch = 
       payment.invoiceNumber.toLowerCase().includes(salesSearchQuery.toLowerCase()) ||
       payment.entity.toLowerCase().includes(salesSearchQuery.toLowerCase()) ||
@@ -250,7 +283,23 @@ export const Treasury = () => {
     return matchesSearch && matchesStatus && matchesMethod && matchesDate;
   });
 
+  // Create sets of existing purchase document IDs for validation
+  // Treasury payments store document_id (e.g., "PO-01/26/0001") as invoice_id
+  const existingPurchaseOrderDocumentIds = useMemo(() => {
+    return new Set(purchaseOrdersData.map(po => po.document_id));
+  }, [purchaseOrdersData]);
+
+  const existingPurchaseInvoiceDocumentIds = useMemo(() => {
+    return new Set(purchaseInvoicesData.map(pi => pi.document_id));
+  }, [purchaseInvoicesData]);
+
   const filteredPurchasePayments = purchasePayments.filter(payment => {
+    // Validate that the purchase document exists by checking document_id (invoice_number)
+    const documentExists = payment.invoiceNumber ? 
+      (existingPurchaseOrderDocumentIds.has(payment.invoiceNumber) || existingPurchaseInvoiceDocumentIds.has(payment.invoiceNumber)) : 
+      false;
+    if (!documentExists) return false;
+    
     const matchesSearch = 
       payment.invoiceNumber.toLowerCase().includes(purchaseSearchQuery.toLowerCase()) ||
       payment.entity.toLowerCase().includes(purchaseSearchQuery.toLowerCase()) ||
@@ -649,135 +698,6 @@ export const Treasury = () => {
           Loading treasury data...
         </div>
       )}
-
-      {/* Recent Sales Inflow & Supplier Outflow */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Sales Inflow */}
-        <div className="card-elevated p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-heading font-semibold text-foreground">
-              Recent Sales Inflow
-            </h2>
-            <Badge variant="outline" className="bg-success/10 text-success text-xs">
-              Expected: {formatMAD(filteredTotalExpectedInflow)}
-            </Badge>
-          </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="data-table-header hover:bg-section">
-                  <TableHead className="min-w-[120px] px-2 py-2 text-xs font-medium">Invoice</TableHead>
-                  <TableHead className="min-w-[130px] px-2 py-2 text-xs font-medium">Client</TableHead>
-                  <TableHead className="min-w-[90px] px-2 py-2 text-xs font-medium">Date</TableHead>
-                  <TableHead className="min-w-[110px] px-2 py-2 text-xs font-medium text-right">Amount</TableHead>
-                  <TableHead className="min-w-[90px] px-2 py-2 text-xs font-medium">Status</TableHead>
-                  <TableHead className="min-w-[100px] px-2 py-2 text-xs font-medium">Method</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredExpectedInflowPayments.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6 text-xs text-muted-foreground">
-                      No pending payments
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredExpectedInflowPayments.slice(0, 5).map((payment) => (
-                    <TableRow key={payment.id} className="hover:bg-section/50">
-                      <TableCell className="font-mono text-xs px-2 py-2 whitespace-nowrap">
-                        {payment.invoiceNumber}
-                      </TableCell>
-                      <TableCell className="px-2 py-2 text-xs max-w-[130px] truncate" title={payment.entity}>
-                        {payment.entity}
-                      </TableCell>
-                      <TableCell className="px-2 py-2 text-xs whitespace-nowrap">
-                        {new Date(payment.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      </TableCell>
-                      <TableCell className="px-2 py-2 text-xs text-right font-medium whitespace-nowrap">
-                        <CurrencyDisplay amount={payment.amount} />
-                      </TableCell>
-                      <TableCell className="px-2 py-2 whitespace-nowrap">
-                        <div className="scale-90 origin-left">
-                          {getStatusBadge(payment.status)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-2 py-2 text-xs whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          {getPaymentMethodIcon(payment.paymentMethod)}
-                          <span className="capitalize text-xs">{payment.paymentMethod.replace('_', ' ')}</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-
-        {/* Supplier Outflow */}
-        <div className="card-elevated p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-heading font-semibold text-foreground">
-              Supplier Outflow
-            </h2>
-            <Badge variant="outline" className="bg-warning/10 text-warning text-xs">
-              Upcoming: {formatMAD(filteredTotalUpcomingPayments)}
-            </Badge>
-          </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="data-table-header hover:bg-section">
-                  <TableHead className="min-w-[120px] px-2 py-2 text-xs font-medium">Invoice</TableHead>
-                  <TableHead className="min-w-[130px] px-2 py-2 text-xs font-medium">Supplier</TableHead>
-                  <TableHead className="min-w-[90px] px-2 py-2 text-xs font-medium">Date</TableHead>
-                  <TableHead className="min-w-[110px] px-2 py-2 text-xs font-medium text-right">Amount</TableHead>
-                  <TableHead className="min-w-[90px] px-2 py-2 text-xs font-medium">Status</TableHead>
-                  <TableHead className="min-w-[100px] px-2 py-2 text-xs font-medium">Method</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUpcomingPayments.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6 text-xs text-muted-foreground">
-                      No upcoming payments
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredUpcomingPayments.slice(0, 5).map((payment) => (
-                    <TableRow key={payment.id} className="hover:bg-section/50">
-                      <TableCell className="font-mono text-xs px-2 py-2 whitespace-nowrap">
-                        {payment.invoiceNumber}
-                      </TableCell>
-                      <TableCell className="px-2 py-2 text-xs max-w-[130px] truncate" title={payment.entity}>
-                        {payment.entity}
-                      </TableCell>
-                      <TableCell className="px-2 py-2 text-xs whitespace-nowrap">
-                        {new Date(payment.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      </TableCell>
-                      <TableCell className="px-2 py-2 text-xs text-right font-medium whitespace-nowrap">
-                        <CurrencyDisplay amount={payment.amount} />
-                      </TableCell>
-                      <TableCell className="px-2 py-2 whitespace-nowrap">
-                        <div className="scale-90 origin-left">
-                          {getStatusBadge(payment.status)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-2 py-2 text-xs whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          {getPaymentMethodIcon(payment.paymentMethod)}
-                          <span className="capitalize text-xs">{payment.paymentMethod.replace('_', ' ')}</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      </div>
 
       {/* Payment Trackers - Sales & Purchases */}
       <div className="space-y-6">
@@ -1207,7 +1127,361 @@ export const Treasury = () => {
             </p>
           </div>
         </div>
+      </div>
 
+      {/* Invoice Insights with Tax Breakdown */}
+      <div className="card-elevated p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-primary/10">
+              <FileText className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-heading font-semibold text-foreground">
+                Invoice Insights & Tax Tracking
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Recent invoices with detailed tax breakdown
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="data-table-header hover:bg-section">
+                <TableHead className="min-w-[120px] px-3 py-3 text-xs font-medium">Invoice #</TableHead>
+                <TableHead className="min-w-[150px] px-3 py-3 text-xs font-medium">Client</TableHead>
+                <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium">Date</TableHead>
+                <TableHead className="min-w-[120px] px-3 py-3 text-xs font-medium text-right">Subtotal</TableHead>
+                <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium text-right">VAT (20%)</TableHead>
+                <TableHead className="min-w-[120px] px-3 py-3 text-xs font-medium text-right">Total</TableHead>
+                <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium">Status</TableHead>
+                <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium">Payment</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {allInvoicesData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">
+                    No invoices found. Create invoices on the Sales page to see them tracked here.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                allInvoicesData
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 10)
+                  .map((invoice) => {
+                    const client = clients.find(c => c.id === invoice.client_id);
+                    const clientName = client?.company || client?.name || 'Unknown Client';
+                    const payment = salesPayments.find(p => p.invoiceNumber === invoice.document_id);
+                    
+                    return (
+                      <TableRow key={invoice.id} className="hover:bg-section/50">
+                        <TableCell className="font-mono text-xs px-3 py-3 whitespace-nowrap font-medium">
+                          {invoice.document_id}
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-xs max-w-[150px] truncate" title={clientName}>
+                          {clientName}
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-xs whitespace-nowrap">
+                          {new Date(invoice.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-xs text-right font-medium whitespace-nowrap">
+                          <CurrencyDisplay amount={invoice.subtotal} />
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-xs text-right font-medium whitespace-nowrap text-warning">
+                          <CurrencyDisplay amount={invoice.vat_amount} />
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-xs text-right font-bold whitespace-nowrap text-success">
+                          <CurrencyDisplay amount={invoice.total} />
+                        </TableCell>
+                        <TableCell className="px-3 py-3 whitespace-nowrap">
+                          <div className="scale-90 origin-left">
+                            <StatusBadge 
+                              status={
+                                invoice.status === 'paid' ? 'success' :
+                                invoice.status === 'overdue' ? 'danger' :
+                                invoice.status === 'sent' ? 'info' :
+                                invoice.status === 'cancelled' ? 'default' :
+                                'warning'
+                              }
+                            >
+                              {invoice.status === 'sent' ? 'Sent' : 
+                               invoice.status === 'paid' ? 'Paid' :
+                               invoice.status === 'overdue' ? 'Overdue' :
+                               invoice.status === 'cancelled' ? 'Cancelled' :
+                               'Draft'}
+                            </StatusBadge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-xs whitespace-nowrap">
+                          {payment ? (
+                            <div className="flex items-center gap-1">
+                              {getPaymentMethodIcon(payment.paymentMethod)}
+                              <span className="capitalize text-xs">{payment.paymentMethod.replace('_', ' ')}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Not tracked</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {allInvoicesData.length > 10 && (
+          <div className="mt-3 text-center">
+            <p className="text-xs text-muted-foreground">
+              Showing latest 10 invoices of {allInvoicesData.length} total
+            </p>
+          </div>
+        )}
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-3 bg-section/50 rounded-lg">
+              <div className="text-xs text-muted-foreground mb-1">Total Invoices</div>
+              <div className="text-lg font-semibold text-foreground">{allInvoicesData.length}</div>
+            </div>
+            <div className="p-3 bg-section/50 rounded-lg">
+              <div className="text-xs text-muted-foreground mb-1">Total VAT Collected</div>
+              <div className="text-lg font-semibold text-warning">
+                <CurrencyDisplay amount={allInvoicesData.reduce((sum, inv) => sum + (inv.vat_amount || 0), 0)} />
+              </div>
+            </div>
+            <div className="p-3 bg-section/50 rounded-lg">
+              <div className="text-xs text-muted-foreground mb-1">Total Invoice Value</div>
+              <div className="text-lg font-semibold text-success">
+                <CurrencyDisplay amount={allInvoicesData.reduce((sum, inv) => sum + inv.total, 0)} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Purchase Insights with Tax Breakdown */}
+      <div className="card-elevated p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-warning/10">
+              <FileText className="w-5 h-5 text-warning" />
+            </div>
+            <div>
+              <h2 className="text-lg font-heading font-semibold text-foreground">
+                Purchase Insights & Tax Tracking
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Recent purchase orders and invoices with detailed tax breakdown
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Purchase Invoices Section */}
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Purchase Invoices (with Tax)</h3>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="data-table-header hover:bg-section">
+                  <TableHead className="min-w-[120px] px-3 py-3 text-xs font-medium">Invoice #</TableHead>
+                  <TableHead className="min-w-[150px] px-3 py-3 text-xs font-medium">Supplier</TableHead>
+                  <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium">Date</TableHead>
+                  <TableHead className="min-w-[120px] px-3 py-3 text-xs font-medium text-right">Subtotal</TableHead>
+                  <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium text-right">VAT (20%)</TableHead>
+                  <TableHead className="min-w-[120px] px-3 py-3 text-xs font-medium text-right">Total</TableHead>
+                  <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium">Status</TableHead>
+                  <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium">Payment</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {purchaseInvoicesData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-4 text-sm text-muted-foreground">
+                      No purchase invoices found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  purchaseInvoicesData
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .slice(0, 5)
+                    .map((invoice) => {
+                      const supplier = suppliers.find(s => s.id === invoice.supplier_id);
+                      const supplierName = supplier?.company || supplier?.name || 'Unknown Supplier';
+                      const payment = purchasePayments.find(p => p.invoiceNumber === invoice.document_id);
+                      
+                      return (
+                        <TableRow key={invoice.id} className="hover:bg-section/50">
+                          <TableCell className="font-mono text-xs px-3 py-3 whitespace-nowrap font-medium">
+                            {invoice.document_id}
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs max-w-[150px] truncate" title={supplierName}>
+                            {supplierName}
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs whitespace-nowrap">
+                            {new Date(invoice.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs text-right font-medium whitespace-nowrap">
+                            <CurrencyDisplay amount={invoice.subtotal} />
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs text-right font-medium whitespace-nowrap text-warning">
+                            <CurrencyDisplay amount={invoice.vat_amount || 0} />
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs text-right font-bold whitespace-nowrap text-danger">
+                            <CurrencyDisplay amount={invoice.total} />
+                          </TableCell>
+                          <TableCell className="px-3 py-3 whitespace-nowrap">
+                            <div className="scale-90 origin-left">
+                              <StatusBadge 
+                                status={
+                                  invoice.status === 'paid' ? 'success' :
+                                  invoice.status === 'overdue' ? 'danger' :
+                                  invoice.status === 'received' ? 'info' :
+                                  invoice.status === 'cancelled' ? 'default' :
+                                  'warning'
+                                }
+                              >
+                                {invoice.status === 'received' ? 'Received' : 
+                                 invoice.status === 'paid' ? 'Paid' :
+                                 invoice.status === 'overdue' ? 'Overdue' :
+                                 invoice.status === 'cancelled' ? 'Cancelled' :
+                                 'Draft'}
+                              </StatusBadge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs whitespace-nowrap">
+                            {payment ? (
+                              <div className="flex items-center gap-1">
+                                {getPaymentMethodIcon(payment.paymentMethod)}
+                                <span className="capitalize text-xs">{payment.paymentMethod.replace('_', ' ')}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Not tracked</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {/* Purchase Orders Section */}
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Purchase Orders (No Tax)</h3>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="data-table-header hover:bg-section">
+                  <TableHead className="min-w-[120px] px-3 py-3 text-xs font-medium">Order #</TableHead>
+                  <TableHead className="min-w-[150px] px-3 py-3 text-xs font-medium">Supplier</TableHead>
+                  <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium">Date</TableHead>
+                  <TableHead className="min-w-[120px] px-3 py-3 text-xs font-medium text-right">Amount</TableHead>
+                  <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium">Status</TableHead>
+                  <TableHead className="min-w-[100px] px-3 py-3 text-xs font-medium">Payment</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {purchaseOrdersData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-4 text-sm text-muted-foreground">
+                      No purchase orders found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  purchaseOrdersData
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .slice(0, 5)
+                    .map((order) => {
+                      const supplier = suppliers.find(s => s.id === order.supplier_id);
+                      const supplierName = supplier?.company || supplier?.name || 'Unknown Supplier';
+                      const payment = purchasePayments.find(p => p.invoiceNumber === order.document_id);
+                      
+                      return (
+                        <TableRow key={order.id} className="hover:bg-section/50">
+                          <TableCell className="font-mono text-xs px-3 py-3 whitespace-nowrap font-medium">
+                            {order.document_id}
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs max-w-[150px] truncate" title={supplierName}>
+                            {supplierName}
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs whitespace-nowrap">
+                            {new Date(order.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs text-right font-bold whitespace-nowrap text-danger">
+                            <CurrencyDisplay amount={order.subtotal} />
+                          </TableCell>
+                          <TableCell className="px-3 py-3 whitespace-nowrap">
+                            <div className="scale-90 origin-left">
+                              <StatusBadge 
+                                status={
+                                  order.status === 'received' ? 'success' :
+                                  order.status === 'confirmed' ? 'info' :
+                                  order.status === 'cancelled' ? 'default' :
+                                  'warning'
+                                }
+                              >
+                                {order.status === 'confirmed' ? 'Confirmed' : 
+                                 order.status === 'received' ? 'Received' :
+                                 order.status === 'cancelled' ? 'Cancelled' :
+                                 order.status === 'sent' ? 'Sent' :
+                                 'Draft'}
+                              </StatusBadge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-3 py-3 text-xs whitespace-nowrap">
+                            {payment ? (
+                              <div className="flex items-center gap-1">
+                                {getPaymentMethodIcon(payment.paymentMethod)}
+                                <span className="capitalize text-xs">{payment.paymentMethod.replace('_', ' ')}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Not tracked</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="p-3 bg-section/50 rounded-lg">
+              <div className="text-xs text-muted-foreground mb-1">Total Purchase Invoices</div>
+              <div className="text-lg font-semibold text-foreground">{purchaseInvoicesData.length}</div>
+            </div>
+            <div className="p-3 bg-section/50 rounded-lg">
+              <div className="text-xs text-muted-foreground mb-1">Total Recoverable VAT</div>
+              <div className="text-lg font-semibold text-warning">
+                <CurrencyDisplay amount={purchaseInvoicesData.reduce((sum, inv) => sum + (inv.vat_amount || 0), 0)} />
+              </div>
+            </div>
+            <div className="p-3 bg-section/50 rounded-lg">
+              <div className="text-xs text-muted-foreground mb-1">Total Purchase Orders</div>
+              <div className="text-lg font-semibold text-foreground">{purchaseOrdersData.length}</div>
+            </div>
+            <div className="p-3 bg-section/50 rounded-lg">
+              <div className="text-xs text-muted-foreground mb-1">Total Purchase Value</div>
+              <div className="text-lg font-semibold text-danger">
+                <CurrencyDisplay amount={
+                  purchaseInvoicesData.reduce((sum, inv) => sum + inv.total, 0) +
+                  purchaseOrdersData.reduce((sum, po) => sum + po.subtotal, 0)
+                } />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Cash Flow Trend */}
         <div className="card-elevated p-4">
           <h2 className="text-base font-heading font-semibold text-foreground mb-3">

@@ -74,25 +74,6 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
 
   // Convert database notifications to UI format
   const notifications: Notification[] = useMemo(() => {
-    if (dbNotifications.length === 0) {
-      // Fallback to localStorage if database is not available
-      if (typeof window !== 'undefined') {
-        try {
-          const stored = localStorage.getItem('notifications');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            return parsed.map((n: any) => ({
-              ...n,
-              timestamp: new Date(n.timestamp),
-            }));
-          }
-        } catch (error) {
-          console.warn('Error loading notifications from localStorage:', error);
-        }
-      }
-      return [];
-    }
-
     return dbNotifications.map(n => ({
       id: n.id,
       title: n.title,
@@ -116,22 +97,6 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
         action_url: notification.actionUrl,
         action_label: notification.actionLabel,
       });
-      
-      // Also save to localStorage as backup
-      if (typeof window !== 'undefined') {
-        try {
-          const newNotification: Notification = {
-            ...notification,
-            id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            timestamp: new Date(),
-            read: false,
-          };
-          const updated = [newNotification, ...notifications];
-          localStorage.setItem('notifications', JSON.stringify(updated));
-        } catch (error) {
-          console.warn('Error saving notification to localStorage:', error);
-        }
-      }
     } catch (error) {
       console.error('Error adding notification:', error);
       throw error;
@@ -141,18 +106,6 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
   const markAsRead = async (id: string) => {
     try {
       await markAsReadMutation.mutateAsync(id);
-      
-      // Also update localStorage as backup
-      if (typeof window !== 'undefined') {
-        try {
-          const updated = notifications.map(n => 
-            n.id === id ? { ...n, read: true } : n
-          );
-          localStorage.setItem('notifications', JSON.stringify(updated));
-        } catch (error) {
-          console.warn('Error updating notification in localStorage:', error);
-        }
-      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
       throw error;
@@ -162,16 +115,6 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
   const markAllAsRead = async () => {
     try {
       await markAllAsReadMutation.mutateAsync(user?.id || null);
-      
-      // Also update localStorage as backup
-      if (typeof window !== 'undefined') {
-        try {
-          const updated = notifications.map(n => ({ ...n, read: true }));
-          localStorage.setItem('notifications', JSON.stringify(updated));
-        } catch (error) {
-          console.warn('Error updating notifications in localStorage:', error);
-        }
-      }
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
       throw error;
@@ -181,16 +124,6 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
   const deleteNotification = async (id: string) => {
     try {
       await deleteMutation.mutateAsync(id);
-      
-      // Also update localStorage as backup
-      if (typeof window !== 'undefined') {
-        try {
-          const updated = notifications.filter(n => n.id !== id);
-          localStorage.setItem('notifications', JSON.stringify(updated));
-        } catch (error) {
-          console.warn('Error updating notifications in localStorage:', error);
-        }
-      }
     } catch (error) {
       console.error('Error deleting notification:', error);
       throw error;
@@ -200,15 +133,6 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
   const clearAllNotifications = async () => {
     try {
       await deleteAllMutation.mutateAsync(user?.id || null);
-      
-      // Also clear localStorage
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.removeItem('notifications');
-        } catch (error) {
-          console.warn('Error clearing notifications from localStorage:', error);
-        }
-      }
     } catch (error) {
       console.error('Error clearing all notifications:', error);
       throw error;

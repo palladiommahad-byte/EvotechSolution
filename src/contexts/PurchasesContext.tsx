@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { purchaseOrdersService, PurchaseOrderWithItems } from '@/services/purchase-orders.service';
 import { purchaseInvoicesService, PurchaseInvoiceWithItems } from '@/services/purchase-invoices.service';
 import { deliveryNotesService, DeliveryNoteWithItems } from '@/services/delivery-notes.service';
+import { treasuryService } from '@/services/treasury.service';
 import { useToast } from '@/hooks/use-toast';
 import { 
   mapPurchaseOrderStatus,
@@ -225,8 +226,40 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         })),
       });
     },
-    onSuccess: () => {
+    onSuccess: async (purchaseOrder: PurchaseOrderWithItems, variables: Omit<PurchaseDocument, 'id' | 'type'>) => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_orders'] });
+      
+      // Automatically create treasury payment entry for the purchase order
+      try {
+        const supplierName = variables.supplierData?.company || variables.supplierData?.name || variables.supplier || 'Unknown Supplier';
+        const paymentMethod = variables.paymentMethod || 'cash';
+        
+        // Determine initial status based on payment method
+        let initialStatus: 'in-hand' | 'pending_bank' | 'cleared' = 'in-hand';
+        if (paymentMethod === 'bank_transfer') {
+          initialStatus = 'pending_bank';
+        }
+        
+        await treasuryService.createPayment({
+          invoice_id: purchaseOrder.document_id,
+          invoice_number: purchaseOrder.document_id,
+          entity: supplierName,
+          amount: purchaseOrder.subtotal, // Purchase orders don't have tax, use subtotal
+          payment_method: paymentMethod,
+          status: initialStatus,
+          payment_date: purchaseOrder.date,
+          payment_type: 'purchase',
+          notes: `Auto-created from purchase order ${purchaseOrder.document_id}`,
+        });
+        
+        // Invalidate treasury queries to refresh the data
+        queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
+      } catch (treasuryError) {
+        // Log error but don't fail the purchase order creation
+        console.error('Error creating treasury payment entry:', treasuryError);
+        // Still show success for purchase order creation
+      }
+      
       toast({ title: 'Purchase order created successfully' });
     },
     onError: (error: Error) => {
@@ -252,7 +285,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Purchase order not found');
       }
       
-      return purchaseOrdersService.update(po._internalId, {
+      const updatedOrder = await purchaseOrdersService.update(po._internalId, {
         date: data.date,
         subtotal: data.total,
         status: data.status ? mapPurchaseOrderStatus(data.status) : undefined,
@@ -264,6 +297,31 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
           unit_price: item.unitPrice,
         })),
       });
+
+      // Sync with treasury payment
+      try {
+        const existingPayment = await treasuryService.getPaymentByInvoiceNumber(po.documentId || po.id, 'purchase');
+        if (existingPayment) {
+          // Update treasury payment with new order data
+          const supplierName = data.supplierData?.company || data.supplierData?.name || po.supplier || 'Unknown Supplier';
+          const paymentMethod = data.paymentMethod || po.paymentMethod || existingPayment.paymentMethod || 'cash';
+          
+          await treasuryService.updatePayment(existingPayment.id, {
+            entity: supplierName,
+            amount: updatedOrder.subtotal,
+            payment_method: paymentMethod,
+            payment_date: updatedOrder.date,
+            notes: `Auto-updated from purchase order ${updatedOrder.document_id}`,
+          });
+          
+          queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
+        }
+      } catch (treasuryError) {
+        // Log error but don't fail the order update
+        console.error('Error updating treasury payment:', treasuryError);
+      }
+
+      return updatedOrder;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_orders'] });
@@ -280,6 +338,18 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       if (!po?._internalId) {
         throw new Error('Purchase order not found');
       }
+      
+      const orderNumber = po.documentId || po.id;
+      
+      // Delete treasury payment first
+      try {
+        await treasuryService.deletePaymentByInvoiceNumber(orderNumber, 'purchase');
+        queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
+      } catch (treasuryError) {
+        // Log error but continue with order deletion
+        console.error('Error deleting treasury payment:', treasuryError);
+      }
+      
       return purchaseOrdersService.delete(po._internalId);
     },
     onSuccess: () => {
@@ -333,8 +403,40 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         })),
       });
     },
-    onSuccess: () => {
+    onSuccess: async (purchaseInvoice: PurchaseInvoiceWithItems, variables: Omit<PurchaseDocument, 'id' | 'type'>) => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_invoices'] });
+      
+      // Automatically create treasury payment entry for the purchase invoice
+      try {
+        const supplierName = variables.supplierData?.company || variables.supplierData?.name || variables.supplier || 'Unknown Supplier';
+        const paymentMethod = variables.paymentMethod || 'cash';
+        
+        // Determine initial status based on payment method
+        let initialStatus: 'in-hand' | 'pending_bank' | 'cleared' = 'in-hand';
+        if (paymentMethod === 'bank_transfer') {
+          initialStatus = 'pending_bank';
+        }
+        
+        await treasuryService.createPayment({
+          invoice_id: purchaseInvoice.document_id,
+          invoice_number: purchaseInvoice.document_id,
+          entity: supplierName,
+          amount: purchaseInvoice.total, // Purchase invoices include tax in total
+          payment_method: paymentMethod,
+          status: initialStatus,
+          payment_date: purchaseInvoice.date,
+          payment_type: 'purchase',
+          notes: `Auto-created from purchase invoice ${purchaseInvoice.document_id} (VAT: ${purchaseInvoice.vat_amount})`,
+        });
+        
+        // Invalidate treasury queries to refresh the data
+        queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
+      } catch (treasuryError) {
+        // Log error but don't fail the purchase invoice creation
+        console.error('Error creating treasury payment entry:', treasuryError);
+        // Still show success for purchase invoice creation
+      }
+      
       toast({ title: 'Purchase invoice created successfully' });
     },
     onError: (error: Error) => {
@@ -386,7 +488,32 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         }));
       }
       
-      return purchaseInvoicesService.update(pi._internalId, updateData);
+      const updatedInvoice = await purchaseInvoicesService.update(pi._internalId, updateData);
+
+      // Sync with treasury payment
+      try {
+        const existingPayment = await treasuryService.getPaymentByInvoiceNumber(pi.documentId || pi.id, 'purchase');
+        if (existingPayment) {
+          // Update treasury payment with new invoice data
+          const supplierName = data.supplierData?.company || data.supplierData?.name || pi.supplier || 'Unknown Supplier';
+          const paymentMethod = data.paymentMethod || pi.paymentMethod || existingPayment.paymentMethod || 'cash';
+          
+          await treasuryService.updatePayment(existingPayment.id, {
+            entity: supplierName,
+            amount: updatedInvoice.total,
+            payment_method: paymentMethod,
+            payment_date: updatedInvoice.date,
+            notes: `Auto-updated from purchase invoice ${updatedInvoice.document_id} (VAT: ${updatedInvoice.vat_amount})`,
+          });
+          
+          queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
+        }
+      } catch (treasuryError) {
+        // Log error but don't fail the invoice update
+        console.error('Error updating treasury payment:', treasuryError);
+      }
+
+      return updatedInvoice;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_invoices'] });
@@ -403,6 +530,18 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       if (!pi?._internalId) {
         throw new Error('Purchase invoice not found');
       }
+      
+      const invoiceNumber = pi.documentId || pi.id;
+      
+      // Delete treasury payment first
+      try {
+        await treasuryService.deletePaymentByInvoiceNumber(invoiceNumber, 'purchase');
+        queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
+      } catch (treasuryError) {
+        // Log error but continue with invoice deletion
+        console.error('Error deleting treasury payment:', treasuryError);
+      }
+      
       return purchaseInvoicesService.delete(pi._internalId);
     },
     onSuccess: () => {

@@ -51,10 +51,12 @@ import { cn } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatMAD, VAT_RATE, calculateInvoiceTotals } from '@/lib/moroccan-utils';
 import { ProductSearch } from '@/components/ui/product-search';
-import { mockProducts, Product } from '@/lib/products';
+import { Product } from '@/lib/products';
+import { useProducts } from '@/contexts/ProductsContext';
 import { CurrencyDisplay } from '@/components/ui/CurrencyDisplay';
 import { useContacts, Contact } from '@/contexts/ContactsContext';
 import { useSales } from '@/contexts/SalesContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { useToast } from '@/hooks/use-toast';
 import { generateDocumentNumber } from '@/lib/document-number-generator';
 import {
@@ -97,41 +99,13 @@ interface SalesDocument {
   taxEnabled?: boolean; // For Divers documents - whether tax was applied
 }
 
-const initialDeliveryNotes: SalesDocument[] = [
-  { id: 'DN-2024-001', client: 'Atlas Industries', date: '2024-01-15', items: 8, total: 245000, status: 'delivered', type: 'delivery_note' },
-  { id: 'DN-2024-002', client: 'Sahara Trading', date: '2024-01-14', items: 3, total: 67000, status: 'in_transit', type: 'delivery_note' },
-  { id: 'DN-2024-003', client: 'Casablanca Steel', date: '2024-01-12', items: 6, total: 156000, status: 'delivered', type: 'delivery_note' },
-];
-
-const initialInvoices: SalesDocument[] = [
-  { id: 'INV-2024-001', client: 'Atlas Industries', date: '2024-01-15', items: 8, total: 245000, status: 'paid', type: 'invoice', paymentMethod: 'bank_transfer' },
-  { id: 'INV-2024-002', client: 'Sahara Trading', date: '2024-01-14', items: 3, total: 67000, status: 'pending', type: 'invoice', paymentMethod: 'cash' },
-  { id: 'INV-2024-003', client: 'Rabat Machines', date: '2024-01-11', items: 10, total: 278000, status: 'overdue', type: 'invoice', paymentMethod: 'check' },
-];
-
-const initialEstimates: SalesDocument[] = [
-  { id: 'EST-2024-001', client: 'Medina Electronics', date: '2024-01-13', items: 15, total: 389000, status: 'sent', type: 'estimate' },
-  { id: 'EST-2024-002', client: 'Oujda Materials', date: '2024-01-10', items: 5, total: 120000, status: 'draft', type: 'estimate' },
-];
-
-const initialCreditNotes: SalesDocument[] = [
-  { id: 'CN-2024-001', client: 'Atlas Industries', date: '2024-01-09', items: 2, total: 45000, status: 'approved', type: 'credit_note' },
-  { id: 'CN-2024-002', client: 'Sahara Trading', date: '2024-01-08', items: 1, total: 12000, status: 'pending', type: 'credit_note' },
-];
-
-const initialDivers: SalesDocument[] = [
-  { id: 'DIV-2024-001', client: 'Atlas Industries', date: '2024-01-10', items: 5, total: 125000, status: 'draft', type: 'divers', taxEnabled: true },
-  { id: 'DIV-2024-002', client: 'Sahara Trading', date: '2024-01-09', items: 3, total: 45000, status: 'draft', type: 'divers', taxEnabled: false },
-];
-
-const initialStatements: SalesDocument[] = [
-  { id: 'ST-2024-001', client: 'Atlas Industries', date: '2024-01-08', items: 0, total: 245000, status: 'current', type: 'statement' },
-  { id: 'ST-2024-002', client: 'Rabat Machines', date: '2024-01-07', items: 0, total: 278000, status: 'overdue', type: 'statement' },
-];
+// Mock data removed - all data now comes from database via SalesContext
 
 export const Sales = () => {
   const { t } = useTranslation();
   const { clients, getClientById } = useContacts();
+  const { products = [] } = useProducts();
+  const { companyInfo } = useCompany();
   const { toast } = useToast();
   const {
     invoices,
@@ -157,8 +131,7 @@ export const Sales = () => {
     deleteCreditNote,
   } = useSales();
   
-  // Keep statements as mock data for now (no database table yet)
-  const [mockStatements, setMockStatements] = useState<SalesDocument[]>(initialStatements);
+  // Statements feature removed - no database table yet
   const [documentType, setDocumentType] = useState<'delivery_note' | 'divers' | 'invoice' | 'estimate' | 'credit_note' | 'statement'>('delivery_note');
   const [activeTab, setActiveTab] = useState<'delivery_note' | 'divers' | 'invoice' | 'estimate' | 'credit_note' | 'statement'>('delivery_note');
   const [formTaxEnabled, setFormTaxEnabled] = useState<boolean>(false); // Tax toggle for Divers
@@ -192,7 +165,7 @@ export const Sales = () => {
       case 'credit_note':
         return creditNotes;
       case 'statement':
-        return mockStatements;
+        return []; // Statements not implemented yet
       default:
         return [];
     }
@@ -243,8 +216,8 @@ export const Sales = () => {
           await deleteCreditNote(deletingDocument.id);
           break;
         case 'statement':
-          // Statements are mock data
-          setMockStatements(prev => prev.filter(d => d.id !== deletingDocument.id));
+          // Statements feature not implemented
+          break;
           break;
       }
 
@@ -297,8 +270,8 @@ export const Sales = () => {
               await deleteCreditNote(doc.id);
               break;
             case 'statement':
-              // Statements are mock data
-              setMockStatements(prev => prev.filter(d => d.id !== doc.id));
+              // Statements feature not implemented
+              break;
               break;
           }
         })
@@ -360,8 +333,8 @@ export const Sales = () => {
           await updateCreditNote(editingDocument.id, updateData);
           break;
         case 'statement':
-          // Statements are mock data
-          setMockStatements(prev => prev.map(d => d.id === editingDocument.id ? { ...d, ...editFormData } as SalesDocument : d));
+          // Statements feature not implemented
+          break;
           break;
       }
 
@@ -398,16 +371,16 @@ export const Sales = () => {
 
       switch (docType) {
         case 'invoice':
-          await generateInvoicePDF(docWithItems as any);
+          await generateInvoicePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'estimate':
-          await generateEstimatePDF(docWithItems as any);
+          await generateEstimatePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'delivery_note':
-          await generateDeliveryNotePDF(docWithItems as any);
+          await generateDeliveryNotePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'divers':
-          await generateDeliveryNotePDF(docWithItems as any); // Use delivery note PDF format for divers
+          await generateDeliveryNotePDF({ ...docWithItems as any, companyInfo }); // Use delivery note PDF format for divers
           break;
         case 'credit_note':
           generateCreditNotePDF(doc);
@@ -448,39 +421,12 @@ export const Sales = () => {
       const { pdf } = await import('@react-pdf/renderer');
       const React = await import('react');
       const { DocumentPDFTemplate } = await import('@/components/documents/DocumentPDFTemplate');
-      const { createMockItems } = await import('@/lib/pdf-template-generator');
 
       const items = Array.isArray(docWithItems.items) 
         ? docWithItems.items 
-        : createMockItems(typeof docWithItems.items === 'number' ? docWithItems.items : 0, docWithItems.total);
+        : []; // Use actual items from document, no mock items
 
-      // Get company info
-      const savedCompanyInfo = localStorage.getItem('companyInfo');
-      const defaultCompanyInfo = {
-        name: 'EVOTECH Solutions SARL',
-        legalForm: 'SARL',
-        email: 'contact@evotech.ma',
-        phone: '+212 5 24 45 67 89',
-        address: 'Zone Industrielle, Lot 123, Marrakech 40000, Morocco',
-        ice: '001234567890123',
-        ifNumber: '12345678',
-        rc: '123456 - Marrakech',
-        tp: '12345678',
-        cnss: '1234567',
-        logo: null,
-        footerText: 'Merci pour votre confiance. Paiement à 30 jours. TVA 20%.',
-      };
-      
-      let companyInfo;
-      try {
-        companyInfo = savedCompanyInfo 
-          ? { ...defaultCompanyInfo, ...JSON.parse(savedCompanyInfo) }
-          : defaultCompanyInfo;
-      } catch (e) {
-        companyInfo = defaultCompanyInfo;
-      }
-
-      // Create PDF document
+      // Create PDF document using company info from context
       const pdfDoc = React.createElement(DocumentPDFTemplate, {
         type: docType as any,
         documentId: docWithItems.id,
@@ -666,7 +612,6 @@ export const Sales = () => {
         ...invoices,
         ...estimates,
         ...creditNotes,
-        ...mockStatements,
       ];
       documentNumber = generateDocumentNumber(
         documentType === 'invoice' ? 'invoice' :
@@ -739,30 +684,13 @@ export const Sales = () => {
           await createCreditNote(newDocumentData);
           break;
         case 'statement':
-          // Statements are mock data
-          const newStatement: SalesDocument = {
-            id: documentNumber,
-            documentId: documentNumber,
-            client: clientData.company || clientData.name || formClient,
-            clientData: {
-              id: clientData.id,
-              name: clientData.name,
-              company: clientData.company || '',
-              email: clientData.email || '',
-              phone: clientData.phone || '',
-              ice: clientData.ice || null,
-              if_number: clientData.ifNumber || clientData.if_number || null,
-              rc: clientData.rc || null,
-            },
-            date: formDate,
-            items: items,
-            total: documentTotal,
-            status: 'draft',
-            type: 'statement',
-            note: formNote || undefined,
-          };
-          setMockStatements([...mockStatements, newStatement]);
-          break;
+          // Statements feature not implemented yet
+          toast({
+            title: "Feature Not Available",
+            description: "Statements feature is not yet implemented.",
+            variant: "destructive",
+          });
+          return;
       }
 
       // Reset form
@@ -943,10 +871,7 @@ export const Sales = () => {
           await updateCreditNote(docId, updateData);
           break;
         case 'statement':
-          // Statements are mock data
-          setMockStatements(prev => prev.map(doc => 
-            doc.id === docId ? { ...doc, status: newStatus } : doc
-          ));
+          // Statements feature not implemented
           break;
       }
     } catch (error) {
@@ -1264,7 +1189,7 @@ export const Sales = () => {
                             <div className="col-span-5">
                               <Label className="text-xs font-medium mb-1.5 block">{t('documents.productOptional')}</Label>
                               <ProductSearch
-                                products={mockProducts}
+                                products={products}
                                 value={item.productId}
                                 onSelect={(product) => handleProductSelect(item.id, product)}
                                 placeholder={t('documents.searchProduct')}
@@ -1656,7 +1581,7 @@ export const Sales = () => {
                             <div className="col-span-5">
                               <Label className="text-xs font-medium mb-1.5 block">Product (Optional)</Label>
                               <ProductSearch
-                                products={mockProducts}
+                                products={products}
                                 value={item.productId}
                                 onSelect={(product) => handleProductSelect(item.id, product)}
                                 placeholder="Search product..."
@@ -2074,7 +1999,7 @@ export const Sales = () => {
                             <div className="col-span-5">
                               <Label className="text-xs font-medium mb-1.5 block">Product (Optional)</Label>
                               <ProductSearch
-                                products={mockProducts}
+                                products={products}
                                 value={item.productId}
                                 onSelect={(product) => handleProductSelect(item.id, product)}
                                 placeholder="Search product..."
@@ -2446,7 +2371,7 @@ export const Sales = () => {
                             <div className="col-span-5">
                               <Label className="text-xs font-medium mb-1.5 block">Product (Optional)</Label>
                               <ProductSearch
-                                products={mockProducts}
+                                products={products}
                                 value={item.productId}
                                 onSelect={(product) => handleProductSelect(item.id, product)}
                                 placeholder="Search product..."

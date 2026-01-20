@@ -9,6 +9,21 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import i18n from '@/i18n/config';
 
+interface CompanyInfo {
+  name: string;
+  legalForm: string;
+  email: string;
+  phone: string;
+  address: string;
+  ice: string;
+  ifNumber: string;
+  rc: string;
+  tp: string;
+  cnss: string;
+  logo?: string | null;
+  footerText?: string;
+}
+
 interface DocumentData {
   type: 'invoice' | 'estimate' | 'delivery_note' | 'purchase_order' | 'credit_note' | 'statement';
   documentId: string;
@@ -22,7 +37,35 @@ interface DocumentData {
   dueDate?: string;
   note?: string;
   language?: string;
+  companyInfo?: CompanyInfo; // Optional - should be provided from CompanyContext
 }
+
+const defaultCompanyInfo: CompanyInfo = {
+  name: 'EVOTECH Solutions SARL',
+  legalForm: 'SARL',
+  email: 'contact@evotech.ma',
+  phone: '+212 5 24 45 67 89',
+  address: 'Zone Industrielle, Lot 123, Marrakech 40000, Morocco',
+  ice: '001234567890123',
+  ifNumber: '12345678',
+  rc: '123456 - Marrakech',
+  tp: '12345678',
+  cnss: '1234567',
+  logo: null,
+  footerText: 'Merci pour votre confiance. Paiement à 30 jours. TVA 20%.',
+};
+
+// Helper function to get company info (from parameter or defaults)
+// Note: companyInfo should always be provided from CompanyContext
+const getCompanyInfo = (providedCompanyInfo?: CompanyInfo): CompanyInfo => {
+  // Use provided company info if available
+  if (providedCompanyInfo) {
+    return { ...defaultCompanyInfo, ...providedCompanyInfo };
+  }
+
+  // Use defaults if not provided (should not happen in normal operation)
+  return defaultCompanyInfo;
+};
 
 // Generate PDF using @react-pdf/renderer for vector PDF
 export const generatePDFFromTemplate = async (data: DocumentData): Promise<void> => {
@@ -31,32 +74,8 @@ export const generatePDFFromTemplate = async (data: DocumentData): Promise<void>
     throw new Error('Cannot generate PDF: items array is empty');
   }
 
-  // Get company info from localStorage
-  const savedCompanyInfo = localStorage.getItem('companyInfo');
-  const defaultCompanyInfo = {
-    name: 'EVOTECH Solutions SARL',
-    legalForm: 'SARL',
-    email: 'contact@evotech.ma',
-    phone: '+212 5 24 45 67 89',
-    address: 'Zone Industrielle, Lot 123, Marrakech 40000, Morocco',
-    ice: '001234567890123',
-    ifNumber: '12345678',
-    rc: '123456 - Marrakech',
-    tp: '12345678',
-    cnss: '1234567',
-    logo: null,
-    footerText: 'Merci pour votre confiance. Paiement à 30 jours. TVA 20%.',
-  };
-  
-  let companyInfo;
-  try {
-    companyInfo = savedCompanyInfo 
-      ? { ...defaultCompanyInfo, ...JSON.parse(savedCompanyInfo) }
-      : defaultCompanyInfo;
-  } catch (e) {
-    console.warn('Failed to parse company info from localStorage, using defaults');
-    companyInfo = defaultCompanyInfo;
-  }
+  // Get company info (from parameter or defaults)
+  const companyInfo = getCompanyInfo(data.companyInfo);
 
   // Get current language
   const currentLanguage = data.language || i18n.language || 'en';
@@ -284,8 +303,9 @@ const generatePDFWithHtml2Canvas = async (data: DocumentData, companyInfo: any):
   });
 };
 
-// Helper to create mock items when items array is not available
-export const createMockItems = (count: number, total: number): InvoiceItem[] => {
+// Helper to create fallback items when items array is not available (legacy support)
+// This is used as a fallback when document.items is a number (count) instead of an array
+export const createFallbackItems = (count: number, total: number): InvoiceItem[] => {
   if (count === 0) {
     return [{
       id: '1',
@@ -305,3 +325,6 @@ export const createMockItems = (count: number, total: number): InvoiceItem[] => 
     total: avgPrice,
   }));
 };
+
+// Legacy export name for backward compatibility
+export const createMockItems = createFallbackItems;

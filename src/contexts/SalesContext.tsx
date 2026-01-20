@@ -10,6 +10,7 @@ import { invoicesService, InvoiceWithItems } from '@/services/invoices.service';
 import { estimatesService, EstimateWithItems } from '@/services/estimates.service';
 import { deliveryNotesService, DeliveryNoteWithItems } from '@/services/delivery-notes.service';
 import { creditNotesService, CreditNoteWithItems } from '@/services/credit-notes.service';
+import { treasuryService } from '@/services/treasury.service';
 import { 
   mapInvoiceStatus, 
   mapInvoiceStatusToUI,
@@ -283,8 +284,40 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
         })),
       });
     },
-    onSuccess: () => {
+    onSuccess: async (invoice: InvoiceWithItems, variables: Omit<SalesDocument, 'id' | 'type'>) => {
       queryClient.invalidateQueries({ queryKey: ['sales', 'invoices'] });
+      
+      // Automatically create treasury payment entry for the invoice
+      try {
+        const clientName = variables.clientData?.company || variables.clientData?.name || variables.client || 'Unknown Client';
+        const paymentMethod = variables.paymentMethod || 'cash';
+        
+        // Determine initial status based on payment method
+        let initialStatus: 'in-hand' | 'pending_bank' | 'cleared' = 'in-hand';
+        if (paymentMethod === 'bank_transfer') {
+          initialStatus = 'pending_bank';
+        }
+        
+        await treasuryService.createPayment({
+          invoice_id: invoice.document_id,
+          invoice_number: invoice.document_id,
+          entity: clientName,
+          amount: invoice.total,
+          payment_method: paymentMethod,
+          status: initialStatus,
+          payment_date: invoice.date,
+          payment_type: 'sales',
+          notes: `Auto-created from invoice ${invoice.document_id}`,
+        });
+        
+        // Invalidate treasury queries to refresh the data
+        queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
+      } catch (treasuryError) {
+        // Log error but don't fail the invoice creation
+        console.error('Error creating treasury payment entry:', treasuryError);
+        // Still show success for invoice creation
+      }
+      
       toast({ title: 'Invoice created successfully' });
     },
     onError: (error: Error) => {
@@ -309,9 +342,10 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Invoice not found');
       }
       
-      return invoicesService.update(invoice._internalId, {
+      const updatedInvoice = await invoicesService.update(invoice._internalId, {
         date: data.date,
         status: data.status ? mapInvoiceStatus(data.status) : undefined,
+        payment_method: data.paymentMethod,
         note: data.note,
         items: data.items?.map(item => ({
           product_id: item.productId,
@@ -320,6 +354,56 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
           unit_price: item.unitPrice,
         })),
       });
+
+      // Sync with treasury payment
+      try {
+        const existingPayment = await treasuryService.getPaymentByInvoiceNumber(invoice.documentId || invoice.id, 'sales');
+        if (existingPayment) {
+          // Update treasury payment with new invoice data
+          const clientName = data.clientData?.company || data.clientData?.name || invoice.client || 'Unknown Client';
+          const paymentMethod = data.paymentMethod || invoice.paymentMethod || existingPayment.paymentMethod || 'cash';
+          
+          // Map invoice status to treasury payment status
+          // Invoice status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+          // Treasury payment status: 'in-hand' | 'pending_bank' | 'cleared'
+          let paymentStatus: 'in-hand' | 'pending_bank' | 'cleared' = existingPayment.status;
+          
+          // Use the updated invoice status from the database response
+          const invoiceStatus = updatedInvoice.status;
+          if (invoiceStatus === 'paid') {
+            // When invoice is marked as paid, mark payment as cleared
+            paymentStatus = 'cleared';
+          } else if (invoiceStatus === 'sent' || invoiceStatus === 'overdue') {
+            // When invoice is sent/overdue, update payment status based on payment method
+            if (paymentMethod === 'bank_transfer' && existingPayment.status === 'in-hand') {
+              paymentStatus = 'pending_bank';
+            }
+            // Otherwise keep current status
+          } else if (invoiceStatus === 'cancelled') {
+            // If cancelled, reset to in-hand
+            paymentStatus = 'in-hand';
+          } else if (invoiceStatus === 'draft') {
+            // If back to draft, keep as in-hand
+            paymentStatus = 'in-hand';
+          }
+          
+          await treasuryService.updatePayment(existingPayment.id, {
+            entity: clientName,
+            amount: updatedInvoice.total,
+            payment_method: paymentMethod,
+            payment_date: updatedInvoice.date,
+            status: paymentStatus,
+            notes: `Auto-updated from invoice ${updatedInvoice.document_id} (Status: ${updatedInvoice.status})`,
+          });
+          
+          queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
+        }
+      } catch (treasuryError) {
+        // Log error but don't fail the invoice update
+        console.error('Error updating treasury payment:', treasuryError);
+      }
+
+      return updatedInvoice;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales', 'invoices'] });
@@ -336,6 +420,18 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       if (!invoice?._internalId) {
         throw new Error('Invoice not found');
       }
+      
+      const invoiceNumber = invoice.documentId || invoice.id;
+      
+      // Delete treasury payment first
+      try {
+        await treasuryService.deletePaymentByInvoiceNumber(invoiceNumber, 'sales');
+        queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
+      } catch (treasuryError) {
+        // Log error but continue with invoice deletion
+        console.error('Error deleting treasury payment:', treasuryError);
+      }
+      
       return invoicesService.delete(invoice._internalId);
     },
     onSuccess: () => {

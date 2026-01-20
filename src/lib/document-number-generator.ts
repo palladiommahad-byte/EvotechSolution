@@ -59,54 +59,10 @@ function parseDocumentNumber(documentId: string): {
 }
 
 /**
- * Gets all existing document IDs from localStorage
- * Note: This is a fallback. The caller should pass existingDocuments for accurate tracking.
+ * Note: This function is now a fallback only.
+ * For production use, prefer generateDocumentNumberFromDB from document-number-service.ts
+ * which uses the database to ensure uniqueness.
  */
-function getAllExistingDocumentIds(): string[] {
-  const allDocuments: string[] = [];
-  
-  try {
-    // Try to get from a centralized storage key
-    const allDocsKey = localStorage.getItem('allDocuments');
-    if (allDocsKey) {
-      const docs = JSON.parse(allDocsKey);
-      if (Array.isArray(docs)) {
-        docs.forEach((doc: DocumentInfo) => {
-          if (doc?.id && isValidDocumentNumber(doc.id)) {
-            allDocuments.push(doc.id);
-          }
-        });
-        return allDocuments;
-      }
-    }
-    
-    // Fallback: Check individual keys (may not exist if using state only)
-    const keys = [
-      'salesInvoices', 'salesEstimates', 'salesDeliveryNotes', 'salesCreditNotes', 'salesStatements',
-      'purchaseOrders', 'purchaseInvoices', 'purchaseDeliveryNotes', 'purchaseStatements',
-      'invoices', 'estimates', 'purchaseOrdersInv', 'deliveryNotesInv', 'statementsInv',
-    ];
-    
-    keys.forEach(key => {
-      try {
-        const docs = JSON.parse(localStorage.getItem(key) || '[]');
-        if (Array.isArray(docs)) {
-          docs.forEach((doc: DocumentInfo) => {
-            if (doc?.id && isValidDocumentNumber(doc.id)) {
-              allDocuments.push(doc.id);
-            }
-          });
-        }
-      } catch (e) {
-        // Ignore errors for individual keys
-      }
-    });
-  } catch (error) {
-    console.error('Error reading documents from localStorage:', error);
-  }
-  
-  return allDocuments;
-}
 
 /**
  * Gets the next serial number for a given prefix, month, and year
@@ -169,12 +125,11 @@ export function generateDocumentNumber(
   const month = String(date.getMonth() + 1).padStart(2, '0'); // 01-12
   const year = String(date.getFullYear()).slice(-2); // Last 2 digits of year
   
-  // Get existing document IDs - merge passed documents with localStorage for complete check
-  const passedIds = existingDocuments
+  // Get existing document IDs from passed documents only
+  // Note: For production, use generateDocumentNumberFromDB from document-number-service.ts
+  const existingIds = existingDocuments
     ? existingDocuments.map(doc => doc.id).filter(Boolean) as string[]
     : [];
-  const localStorageIds = getAllExistingDocumentIds();
-  const existingIds = [...new Set([...passedIds, ...localStorageIds])]; // Remove duplicates
   
   // Get next serial number
   const serialNumber = getNextSerialNumber(prefix, month, year, existingIds);
