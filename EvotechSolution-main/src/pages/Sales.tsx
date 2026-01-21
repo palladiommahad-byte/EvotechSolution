@@ -48,6 +48,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { ToastAction } from '@/components/ui/toast';
+
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatMAD, VAT_RATE, calculateInvoiceTotals } from '@/lib/moroccan-utils';
 import { ProductSearch } from '@/components/ui/product-search';
@@ -76,32 +78,10 @@ import {
   generateBulkDocumentsCSV,
 } from '@/lib/csv-generator';
 
-interface SalesItem {
-  id: string;
-  productId?: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-}
-
-interface SalesDocument {
-  id: string;
-  documentId?: string;
-  client: string;
-  clientData?: UIContact; // Full client information from CRM
-  date: string;
-  items: number | SalesItem[]; // Can be count or full items array
-  total: number;
-  status: string;
-  type: 'delivery_note' | 'divers' | 'invoice' | 'estimate' | 'credit_note' | 'statement';
-  paymentMethod?: 'cash' | 'check' | 'bank_transfer';
-  checkNumber?: string;
-  dueDate?: string;
-  note?: string;
-  taxEnabled?: boolean; // For Divers documents - whether tax was applied
-  warehouseId?: string; // For delivery notes
-}
+// Local interfaces removed in favor of imports from SalesContext
+import { SalesDocument as ContextSalesDocument, SalesItem as ContextSalesItem } from '@/contexts/SalesContext';
+type SalesDocument = ContextSalesDocument;
+type SalesItem = ContextSalesItem;
 
 // Mock data removed - all data now comes from database via SalesContext
 
@@ -147,7 +127,6 @@ export const Sales = () => {
   const [formWarehouse, setFormWarehouse] = useState('marrakech');
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formPaymentMethod, setFormPaymentMethod] = useState<'cash' | 'check' | 'bank_transfer'>('cash');
-  const [formCheckNumber, setFormCheckNumber] = useState('');
   const [formDueDate, setFormDueDate] = useState('');
   const [formNote, setFormNote] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -501,25 +480,35 @@ export const Sales = () => {
 
   const handleDownloadExcel = (doc: SalesDocument) => {
     const docType = doc.type || activeTab;
-    generateDocumentExcel(doc, docType);
+    const itemsCount = Array.isArray(doc.items) ? doc.items.length : (doc.items || 0);
+    generateDocumentExcel({ ...doc, items: itemsCount }, docType);
   };
 
   const handleBulkExportExcel = () => {
     const documentsToExport = filteredDocuments.filter(doc => selectedDocuments.has(doc.id));
     if (documentsToExport.length > 0) {
-      generateBulkDocumentsExcel(documentsToExport, activeTab);
+      const mappedDocs = documentsToExport.map(doc => ({
+        ...doc,
+        items: Array.isArray(doc.items) ? doc.items.length : (doc.items || 0)
+      }));
+      generateBulkDocumentsExcel(mappedDocs, activeTab);
     }
   };
 
   const handleDownloadCSV = (doc: SalesDocument) => {
     const docType = doc.type || activeTab;
-    generateDocumentCSV(doc, docType);
+    const itemsCount = Array.isArray(doc.items) ? doc.items.length : (doc.items || 0);
+    generateDocumentCSV({ ...doc, items: itemsCount }, docType);
   };
 
   const handleBulkExportCSV = () => {
     const documentsToExport = filteredDocuments.filter(doc => selectedDocuments.has(doc.id));
     if (documentsToExport.length > 0) {
-      generateBulkDocumentsCSV(documentsToExport, activeTab);
+      const mappedDocs = documentsToExport.map(doc => ({
+        ...doc,
+        items: Array.isArray(doc.items) ? doc.items.length : (doc.items || 0)
+      }));
+      generateBulkDocumentsCSV(mappedDocs, activeTab);
     }
   };
 
@@ -676,7 +665,6 @@ export const Sales = () => {
         total: documentTotal,
         status: 'draft',
         paymentMethod: documentType === 'invoice' ? formPaymentMethod : undefined,
-        checkNumber: documentType === 'invoice' && formPaymentMethod === 'check' ? (formCheckNumber || undefined) : undefined,
         dueDate: formDueDate || undefined,
         note: formNote || undefined,
         taxEnabled: documentType === 'divers' ? formTaxEnabled : undefined,
@@ -715,7 +703,6 @@ export const Sales = () => {
       setFormClient('');
       setFormDate(new Date().toISOString().split('T')[0]);
       setFormPaymentMethod('cash');
-      setFormCheckNumber('');
       setFormDueDate('');
       setFormNote('');
       setFormTaxEnabled(false);
@@ -735,7 +722,24 @@ export const Sales = () => {
       });
     } catch (error) {
       console.error('Error creating document:', error);
-      // Error toast is handled by the context
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // Check if it's a stock validation error
+      if (errorMessage.includes('Insufficient stock')) {
+        toast({
+          title: "Stock Validation Error",
+          description: errorMessage,
+          variant: "destructive",
+          duration: Infinity, // Persistent
+          action: <ToastAction altText="OK">OK</ToastAction>,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to create document: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -760,6 +764,7 @@ export const Sales = () => {
 
     const previewDocument: SalesDocument & { items?: any } = {
       id: 'PREVIEW',
+      documentId: 'PREVIEW',
       client: clientData?.company || clientData?.name || formClient,
       clientData: clientData,
       date: formDate,
@@ -2005,9 +2010,6 @@ export const Sales = () => {
                           onValueChange={(value) => {
                             const method = value as 'cash' | 'check' | 'bank_transfer';
                             setFormPaymentMethod(method);
-                            if (method !== 'check') {
-                              setFormCheckNumber('');
-                            }
                           }}
                         >
                           <SelectTrigger>
@@ -2020,16 +2022,6 @@ export const Sales = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      {formPaymentMethod === 'check' && (
-                        <div className="space-y-2">
-                          <Label>{t('documents.checkSerialNumber') || 'Check Serial Number'}</Label>
-                          <Input
-                            placeholder="Enter check serial number"
-                            value={formCheckNumber}
-                            onChange={(e) => setFormCheckNumber(e.target.value)}
-                          />
-                        </div>
-                      )}
                       <div className="space-y-2 md:col-span-2">
                         <Label>{t('documents.paymentTerms')}</Label>
                         <Select>

@@ -26,8 +26,10 @@ export interface PurchaseInvoice {
   vat_amount: number;
   total: number;
   payment_method: 'cash' | 'check' | 'bank_transfer' | null;
+  check_number: string | null;
   status: 'draft' | 'received' | 'paid' | 'overdue' | 'cancelled';
   note: string | null;
+  attachment_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,12 +60,12 @@ export const purchaseInvoicesService = {
   }): Promise<PurchaseInvoiceWithItems[]> {
     try {
       const supabase = getSupabaseClient();
-      
+
       // Build query
       let query = supabase
         .from('purchase_invoices')
         .select('*');
-      
+
       // Apply filters
       if (filters?.status) {
         query = query.eq('status', filters.status);
@@ -77,14 +79,14 @@ export const purchaseInvoicesService = {
       if (filters?.endDate) {
         query = query.lte('date', filters.endDate);
       }
-      
+
       // Order and execute
       const { data: purchaseInvoices, error } = await query
         .order('date', { ascending: false })
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
+
       // Fetch items and supplier data for each purchase invoice
       const purchaseInvoicesWithItems: PurchaseInvoiceWithItems[] = await Promise.all(
         (purchaseInvoices || []).map(async (pi) => {
@@ -94,7 +96,7 @@ export const purchaseInvoicesService = {
             .select('*')
             .eq('purchase_invoice_id', pi.id)
             .order('created_at', { ascending: true });
-          
+
           // Fetch supplier data
           let supplier = undefined;
           if (pi.supplier_id) {
@@ -107,7 +109,7 @@ export const purchaseInvoicesService = {
               supplier = supplierData;
             }
           }
-          
+
           return {
             ...pi,
             items: items || [],
@@ -115,7 +117,7 @@ export const purchaseInvoicesService = {
           };
         })
       );
-      
+
       return purchaseInvoicesWithItems;
     } catch (error) {
       console.error('Error fetching purchase invoices:', error);
@@ -129,23 +131,23 @@ export const purchaseInvoicesService = {
   async getById(id: string): Promise<PurchaseInvoiceWithItems | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { data: purchaseInvoice, error } = await supabase
         .from('purchase_invoices')
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (error) throw error;
       if (!purchaseInvoice) return null;
-      
+
       // Fetch items
       const { data: items } = await supabase
         .from('purchase_invoice_items')
         .select('*')
         .eq('purchase_invoice_id', id)
         .order('created_at', { ascending: true });
-      
+
       // Fetch supplier data
       let supplier = undefined;
       if (purchaseInvoice.supplier_id) {
@@ -158,7 +160,7 @@ export const purchaseInvoicesService = {
           supplier = supplierData;
         }
       }
-      
+
       return {
         ...purchaseInvoice,
         items: items || [],
@@ -183,8 +185,10 @@ export const purchaseInvoicesService = {
     vat_amount: number;
     total: number;
     payment_method?: 'cash' | 'check' | 'bank_transfer';
+    check_number?: string;
     status?: 'draft' | 'received' | 'paid' | 'overdue' | 'cancelled';
     note?: string;
+    attachment_url?: string;
     items: Array<{
       product_id?: string | null;
       description: string;
@@ -194,7 +198,7 @@ export const purchaseInvoicesService = {
   }): Promise<PurchaseInvoiceWithItems> {
     try {
       const supabase = getSupabaseClient();
-      
+
       // Create purchase invoice
       const { data: purchaseInvoice, error: piError } = await supabase
         .from('purchase_invoices')
@@ -208,14 +212,16 @@ export const purchaseInvoicesService = {
           vat_amount: data.vat_amount,
           total: data.total,
           payment_method: data.payment_method || null,
+          check_number: data.payment_method === 'check' ? (data.check_number || null) : null,
           status: data.status || 'draft',
           note: data.note || null,
+          attachment_url: data.attachment_url || null,
         })
         .select()
         .single();
-      
+
       if (piError) throw piError;
-      
+
       // Create items
       if (data.items && data.items.length > 0) {
         const itemsToInsert = data.items.map(item => ({
@@ -226,18 +232,18 @@ export const purchaseInvoicesService = {
           unit_price: item.unit_price,
           total: item.quantity * item.unit_price,
         }));
-        
+
         const { error: itemsError } = await supabase
           .from('purchase_invoice_items')
           .insert(itemsToInsert);
-        
+
         if (itemsError) throw itemsError;
       }
-      
+
       // Fetch the complete purchase invoice with items and supplier
       const completePI = await this.getById(purchaseInvoice.id);
       if (!completePI) throw new Error('Failed to fetch created purchase invoice');
-      
+
       return completePI;
     } catch (error) {
       console.error('Error creating purchase invoice:', error);
@@ -258,8 +264,10 @@ export const purchaseInvoicesService = {
       vat_amount?: number;
       total?: number;
       payment_method?: 'cash' | 'check' | 'bank_transfer';
+      check_number?: string;
       status?: 'draft' | 'received' | 'paid' | 'overdue' | 'cancelled';
       note?: string;
+      attachment_url?: string;
       items?: Array<{
         product_id?: string | null;
         description: string;
@@ -270,7 +278,7 @@ export const purchaseInvoicesService = {
   ): Promise<PurchaseInvoiceWithItems> {
     try {
       const supabase = getSupabaseClient();
-      
+
       // Update purchase invoice
       const updateData: any = {};
       if (data.date !== undefined) updateData.date = data.date;
@@ -280,17 +288,19 @@ export const purchaseInvoicesService = {
       if (data.vat_amount !== undefined) updateData.vat_amount = data.vat_amount;
       if (data.total !== undefined) updateData.total = data.total;
       if (data.payment_method !== undefined) updateData.payment_method = data.payment_method || null;
+      if (data.check_number !== undefined) updateData.check_number = data.payment_method === 'check' ? (data.check_number || null) : null;
       if (data.status !== undefined) updateData.status = data.status;
       if (data.note !== undefined) updateData.note = data.note || null;
+      if (data.attachment_url !== undefined) updateData.attachment_url = data.attachment_url || null;
       updateData.updated_at = new Date().toISOString();
-      
+
       const { error: updateError } = await supabase
         .from('purchase_invoices')
         .update(updateData)
         .eq('id', id);
-      
+
       if (updateError) throw updateError;
-      
+
       // Update items if provided
       if (data.items !== undefined) {
         // Delete existing items
@@ -298,9 +308,9 @@ export const purchaseInvoicesService = {
           .from('purchase_invoice_items')
           .delete()
           .eq('purchase_invoice_id', id);
-        
+
         if (deleteError) throw deleteError;
-        
+
         // Insert new items
         if (data.items.length > 0) {
           const itemsToInsert = data.items.map(item => ({
@@ -311,19 +321,19 @@ export const purchaseInvoicesService = {
             unit_price: item.unit_price,
             total: item.quantity * item.unit_price,
           }));
-          
+
           const { error: itemsError } = await supabase
             .from('purchase_invoice_items')
             .insert(itemsToInsert);
-          
+
           if (itemsError) throw itemsError;
         }
       }
-      
+
       // Fetch the updated purchase invoice
       const updatedPI = await this.getById(id);
       if (!updatedPI) throw new Error('Failed to fetch updated purchase invoice');
-      
+
       return updatedPI;
     } catch (error) {
       console.error('Error updating purchase invoice:', error);
@@ -337,13 +347,13 @@ export const purchaseInvoicesService = {
   async delete(id: string): Promise<void> {
     try {
       const supabase = getSupabaseClient();
-      
+
       // Delete purchase invoice (items will be deleted via CASCADE)
       const { error } = await supabase
         .from('purchase_invoices')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     } catch (error) {
       console.error('Error deleting purchase invoice:', error);

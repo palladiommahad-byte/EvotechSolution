@@ -43,8 +43,8 @@ export const generateInvoicePDF = async (document: {
   note?: string;
   companyInfo?: CompanyInfo;
 }) => {
-  const items: InvoiceItem[] = Array.isArray(document.items) 
-    ? document.items 
+  const items: InvoiceItem[] = Array.isArray(document.items)
+    ? document.items
     : createFallbackItems(document.items, document.total);
 
   await generatePDFFromTemplate({
@@ -116,8 +116,8 @@ export const generateInvoicePDFLegacy = (document: {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     const paymentMethodText = document.paymentMethod === 'cash' ? 'Espèces' :
-                              document.paymentMethod === 'check' ? 'Chèque' :
-                              'Virement bancaire';
+      document.paymentMethod === 'check' ? 'Chèque' :
+        'Virement bancaire';
     doc.text(`Méthode de paiement: ${paymentMethodText}`, 20, yPos);
   }
 
@@ -157,7 +157,7 @@ export const generatePurchaseOrderPDFLegacy = (document: {
   if (document.supplier) {
     yPos = addWrappedText(doc, `Fournisseur: ${document.supplier}`, 20, yPos, 90, 5);
   }
-  
+
   yPos += 10;
   doc.setFont('helvetica', 'bold');
   doc.text('Résumé', 20, yPos);
@@ -165,7 +165,7 @@ export const generatePurchaseOrderPDFLegacy = (document: {
   doc.setFont('helvetica', 'normal');
   doc.text(`Nombre d'articles: ${document.items}`, 20, yPos);
   yPos += 5;
-  
+
   yPos += 5;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -216,7 +216,7 @@ export const generateDeliveryNotePDFLegacy = (document: {
   doc.setFont('helvetica', 'normal');
   doc.text(`Nombre d'articles: ${document.items}`, 20, yPos);
   yPos += 5;
-  
+
   yPos += 5;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -244,8 +244,8 @@ export const generatePurchaseOrderPDF = async (document: {
   dueDate?: string;
   companyInfo?: CompanyInfo;
 }) => {
-  const items: InvoiceItem[] = Array.isArray(document.items) 
-    ? document.items 
+  const items: InvoiceItem[] = Array.isArray(document.items)
+    ? document.items
     : createFallbackItems(document.items, document.total);
 
   await generatePDFFromTemplate({
@@ -278,8 +278,8 @@ export const generateDeliveryNotePDF = async (document: {
   note?: string;
   companyInfo?: CompanyInfo;
 }) => {
-  const items: InvoiceItem[] = Array.isArray(document.items) 
-    ? document.items 
+  const items: InvoiceItem[] = Array.isArray(document.items)
+    ? document.items
     : createFallbackItems(document.items, document.total);
 
   await generatePDFFromTemplate({
@@ -313,8 +313,8 @@ export const generateEstimatePDF = async (document: {
   note?: string;
   companyInfo?: CompanyInfo;
 }) => {
-  const items: InvoiceItem[] = Array.isArray(document.items) 
-    ? document.items 
+  const items: InvoiceItem[] = Array.isArray(document.items)
+    ? document.items
     : createFallbackItems(document.items, document.total);
 
   await generatePDFFromTemplate({
@@ -365,7 +365,7 @@ export const generateEstimatePDFLegacy = (document: {
   doc.setFont('helvetica', 'normal');
   doc.text(`Nombre d'articles: ${document.items}`, 20, yPos);
   yPos += 5;
-  
+
   yPos += 5;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -409,7 +409,7 @@ export const generateCreditNotePDF = (document: {
   doc.setFont('helvetica', 'normal');
   doc.text(`Nombre d'articles: ${document.items}`, 20, yPos);
   yPos += 5;
-  
+
   yPos += 5;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -503,7 +503,7 @@ export const generateInventoryPDF = (products: Array<{
       doc.addPage();
       yPos = 20;
     }
-    
+
     doc.text(product.sku, 20, yPos);
     const nameLines = doc.splitTextToSize(product.name, 40);
     doc.text(nameLines, 50, yPos);
@@ -512,7 +512,7 @@ export const generateInventoryPDF = (products: Array<{
     doc.text(product.stock.toString(), 140, yPos - nameLines.length * 5);
     doc.text(formatMADFull(product.price), 160, yPos - nameLines.length * 5);
     yPos += 8;
-    
+
     if (index < products.length - 1) {
       doc.line(20, yPos, 190, yPos);
       yPos += 2;
@@ -564,4 +564,80 @@ export const generateTaxReportPDF = (data: {
   doc.text(`Généré le ${new Date().toLocaleDateString('fr-MA')}`, 105, yPos, { align: 'center' });
 
   doc.save(`tax_report_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+// Generate Purchase Invoice PDF using new template
+export const generatePurchaseInvoicePDF = async (document: {
+  id: string;
+  client?: string;
+  supplier?: string;
+  clientData?: any;
+  supplierData?: any;
+  date: string;
+  items: number | InvoiceItem[];
+  total: number;
+  paymentMethod?: string;
+  status?: string;
+  type?: string;
+  dueDate?: string;
+  note?: string;
+  companyInfo?: CompanyInfo;
+}) => {
+  const items: InvoiceItem[] = Array.isArray(document.items)
+    ? document.items
+    : createFallbackItems(document.items, document.total);
+
+  await generatePDFFromTemplate({
+    type: 'purchase_invoice',
+    documentId: document.id,
+    date: document.date,
+    client: document.client,
+    supplier: document.supplier,
+    clientData: document.clientData,
+    supplierData: document.supplierData,
+    items,
+    paymentMethod: document.paymentMethod as 'cash' | 'check' | 'bank_transfer' | undefined,
+    dueDate: document.dueDate,
+    note: document.note,
+    language: i18n.language || 'en',
+    companyInfo: document.companyInfo,
+  });
+};
+
+// Generate Purchase Delivery Note PDF using new template
+export const generatePurchaseDeliveryNotePDF = async (document: {
+  id: string;
+  client?: string;
+  supplier?: string;
+  clientData?: any;
+  supplierData?: any;
+  date: string;
+  items: number | InvoiceItem[];
+  total: number;
+  paymentMethod?: string;
+  status?: string;
+  type?: string;
+  dueDate?: string;
+  note?: string;
+  companyInfo?: CompanyInfo;
+}) => {
+  const items: InvoiceItem[] = Array.isArray(document.items)
+    ? document.items
+    : createFallbackItems(document.items, document.total);
+
+  await generatePDFFromTemplate({
+    type: 'purchase_delivery_note',
+    documentId: document.id,
+    date: document.date,
+    client: document.client,
+    supplier: document.supplier,
+    clientData: document.clientData,
+    supplierData: document.supplierData,
+    items,
+    paymentMethod: document.paymentMethod as 'cash' | 'check' | 'bank_transfer' | undefined,
+    dueDate: document.dueDate,
+    note: document.note,
+    language: i18n.language || 'en',
+    companyInfo: document.companyInfo,
+  });
 };

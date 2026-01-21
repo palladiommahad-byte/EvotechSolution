@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, ShoppingCart, FileText, Download, Package, Receipt, FileCheck, Calculator, Trash2, Send, Eye, Edit, Check, FileSpreadsheet, ChevronDown, Printer, TrendingUp, CheckSquare, FileX } from 'lucide-react';
+import { Plus, Search, ShoppingCart, FileText, Download, Package, Receipt, FileCheck, Calculator, Trash2, Send, Eye, Edit, Check, FileSpreadsheet, ChevronDown, Printer, TrendingUp, CheckSquare, FileX, Upload, Image as ImageIcon, Paperclip } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +62,8 @@ import {
   generatePurchaseOrderPDF,
   generateDeliveryNotePDF,
   generateInvoicePDF,
+  generatePurchaseInvoicePDF,
+  generatePurchaseDeliveryNotePDF,
   generateStatementPDF,
 } from '@/lib/pdf-generator';
 import {
@@ -72,6 +74,7 @@ import {
   generateDocumentCSV,
   generateBulkDocumentsCSV,
 } from '@/lib/csv-generator';
+import { getSupabaseClient } from '@/lib/supabase';
 
 // PurchaseItem and PurchaseDocument interfaces are imported from PurchasesContext
 
@@ -98,7 +101,7 @@ export const Purchases = () => {
     updateDeliveryNote,
     deleteDeliveryNote,
   } = usePurchases();
-  
+
   // Statements feature removed - no database table yet
   const [documentType, setDocumentType] = useState<'purchase_order' | 'delivery_note' | 'invoice' | 'statement'>('purchase_order');
   const [activeTab, setActiveTab] = useState<'purchase_order' | 'delivery_note' | 'invoice' | 'statement'>('purchase_order');
@@ -117,6 +120,18 @@ export const Purchases = () => {
   const [editingDocument, setEditingDocument] = useState<PurchaseDocument | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<PurchaseDocument>>({});
   const [deletingDocument, setDeletingDocument] = useState<PurchaseDocument | null>(null);
+
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Manual Document ID state
+  const [manualDocumentId, setManualDocumentId] = useState('');
+  const [isManualId, setIsManualId] = useState(false);
+
+  // Check number state
+  const [formCheckNumber, setFormCheckNumber] = useState('');
 
   // Helper to get current documents based on activeTab
   const getCurrentDocuments = (): PurchaseDocument[] => {
@@ -181,7 +196,7 @@ export const Purchases = () => {
         newSet.delete(deletingDocument.id);
         return newSet;
       });
-      
+
       const docTypeName = documentTypeNames[deletingDocument.type] || 'Document';
       setDeletingDocument(null);
     } catch (error) {
@@ -202,7 +217,7 @@ export const Purchases = () => {
 
     try {
       const documentsToDelete = getCurrentDocuments().filter(d => selectedDocuments.has(d.id));
-      
+
       // Delete all selected documents
       await Promise.all(
         documentsToDelete.map(async (doc) => {
@@ -227,7 +242,7 @@ export const Purchases = () => {
       const count = selectedDocuments.size;
       const docTypeName = documentTypeNames[activeTab] || t('documents.document');
       setSelectedDocuments(new Set());
-      
+
       toast({
         title: t('documents.documentsDeleted', { defaultValue: 'Documents Deleted' }),
         description: t('documents.documentsDeletedDescription', { count, docTypeName, defaultValue: `${count} ${docTypeName} have been deleted successfully.` }),
@@ -289,13 +304,13 @@ export const Purchases = () => {
   const handleDownloadPDF = async (doc: PurchaseDocument & { items?: any }) => {
     try {
       const docType = doc.type || activeTab;
-      
+
       // If supplierData is missing, try to find it from CRM using supplier name
       let docWithSupplierData = { ...doc };
       if (!docWithSupplierData.supplierData && docWithSupplierData.supplier) {
         // Try to find supplier by matching company or name
-        const foundSupplier = suppliers.find(s => 
-          s.company === docWithSupplierData.supplier || 
+        const foundSupplier = suppliers.find(s =>
+          s.company === docWithSupplierData.supplier ||
           s.name === docWithSupplierData.supplier
         );
         if (foundSupplier) {
@@ -311,7 +326,7 @@ export const Purchases = () => {
           };
         }
       }
-      
+
       // Prepare document data with items if available
       const docWithItems = {
         ...docWithSupplierData,
@@ -323,10 +338,10 @@ export const Purchases = () => {
           await generatePurchaseOrderPDF({ ...docWithItems as any, companyInfo });
           break;
         case 'delivery_note':
-          await generateDeliveryNotePDF({ ...docWithItems as any, companyInfo });
+          await generatePurchaseDeliveryNotePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'invoice':
-          await generateInvoicePDF({ ...docWithItems as any, companyInfo });
+          await generatePurchaseInvoicePDF({ ...docWithItems as any, companyInfo });
           break;
         case 'statement':
           generateStatementPDF(doc);
@@ -345,12 +360,12 @@ export const Purchases = () => {
   const handlePrintPDF = async (doc: PurchaseDocument & { items?: any }) => {
     try {
       const docType = doc.type || activeTab;
-      
+
       // If supplierData is missing, try to find it from CRM using supplier name
       let docWithSupplierData = { ...doc };
       if (!docWithSupplierData.supplierData && docWithSupplierData.supplier) {
-        const foundSupplier = suppliers.find(s => 
-          s.company === docWithSupplierData.supplier || 
+        const foundSupplier = suppliers.find(s =>
+          s.company === docWithSupplierData.supplier ||
           s.name === docWithSupplierData.supplier
         );
         if (foundSupplier) {
@@ -366,7 +381,7 @@ export const Purchases = () => {
           };
         }
       }
-      
+
       // Prepare document data with items if available
       const docWithItems = {
         ...docWithSupplierData,
@@ -377,8 +392,8 @@ export const Purchases = () => {
       const { pdf } = await import('@react-pdf/renderer');
       const React = await import('react');
       const { DocumentPDFTemplate } = await import('@/components/documents/DocumentPDFTemplate');
-      const items = Array.isArray(docWithItems.items) 
-        ? docWithItems.items 
+      const items = Array.isArray(docWithItems.items)
+        ? docWithItems.items
         : []; // Use actual items from document, no mock items
 
       // Create PDF document using company info from context
@@ -565,34 +580,73 @@ export const Purchases = () => {
       return;
     }
 
-    // Generate unique document number using database function
-    // This ensures uniqueness by checking the database directly
+    // Generate unique document number using database function or use manual input
     let documentNumber: string;
-    try {
-      const { generateDocumentNumberFromDB } = await import('@/lib/document-number-service');
-      documentNumber = await generateDocumentNumberFromDB(
-        documentType === 'invoice' ? 'purchase_invoice' :
-        documentType === 'purchase_order' ? 'purchase_order' :
-        documentType === 'delivery_note' ? 'delivery_note' :
-        'statement',
-        formDate
-      );
-    } catch (error) {
-      console.warn('Failed to generate document number from database, using fallback:', error);
-      // Fallback to client-side generation if database function fails
-      const allExistingDocuments = [
-        ...purchaseOrders,
-        ...deliveryNotes,
-        ...purchaseInvoices,
-      ];
-      documentNumber = generateDocumentNumber(
-        documentType === 'invoice' ? 'purchase_invoice' :
-        documentType === 'purchase_order' ? 'purchase_order' :
-        documentType === 'delivery_note' ? 'delivery_note' :
-        'statement',
-        allExistingDocuments,
-        formDate
-      );
+
+    if (isManualId && manualDocumentId.trim()) {
+      documentNumber = manualDocumentId.trim();
+    } else {
+      try {
+        const { generateDocumentNumberFromDB } = await import('@/lib/document-number-service');
+        documentNumber = await generateDocumentNumberFromDB(
+          documentType === 'invoice' ? 'purchase_invoice' :
+            documentType === 'purchase_order' ? 'purchase_order' :
+              documentType === 'delivery_note' ? 'delivery_note' :
+                'statement',
+          formDate
+        );
+      } catch (error) {
+        console.warn('Failed to generate document number from database, using fallback:', error);
+        // Fallback to client-side generation if database function fails
+        const allExistingDocuments = [
+          ...purchaseOrders,
+          ...deliveryNotes,
+          ...purchaseInvoices,
+        ];
+        documentNumber = generateDocumentNumber(
+          documentType === 'invoice' ? 'purchase_invoice' :
+            documentType === 'purchase_order' ? 'purchase_order' :
+              documentType === 'delivery_note' ? 'delivery_note' :
+                'statement',
+          allExistingDocuments,
+          formDate
+        );
+      }
+    }
+
+    // Handle File Upload
+    let attachmentUrl: string | null = null;
+    if (selectedFile && documentType === 'invoice') {
+      try {
+        setIsUploading(true);
+        const supabase = getSupabaseClient();
+
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${documentNumber}-${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('purchase-attachments')
+          .upload(fileName, selectedFile);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('purchase-attachments')
+          .getPublicUrl(fileName);
+
+        attachmentUrl = publicUrl;
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        toast({
+          title: t('common.error', { defaultValue: 'Error' }),
+          description: t('documents.uploadError', { defaultValue: 'Failed to upload attachment, proceeding without it.' }),
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploading(false);
+      }
     }
 
     // Calculate total based on document type
@@ -607,6 +661,7 @@ export const Purchases = () => {
       const newDocumentData: Omit<PurchaseDocument, 'id' | 'type'> = {
         documentId: documentNumber,
         supplier: supplierData.id,
+        attachment_url: attachmentUrl,
         supplierData: {
           id: supplierData.id,
           name: supplierData.name,
@@ -629,6 +684,7 @@ export const Purchases = () => {
         total: documentTotal,
         status: 'draft',
         paymentMethod: documentType === 'invoice' ? formPaymentMethod : undefined,
+        checkNumber: documentType === 'invoice' && formPaymentMethod === 'check' ? (formCheckNumber || undefined) : undefined,
         dueDate: formDueDate || undefined,
         note: formNote || undefined,
       };
@@ -659,8 +715,14 @@ export const Purchases = () => {
       setFormSupplier('');
       setFormDate(new Date().toISOString().split('T')[0]);
       setFormPaymentMethod('cash');
+      setFormCheckNumber('');
       setFormDueDate('');
       setFormNote('');
+      setManualDocumentId('');
+      setIsManualId(false);
+      setSelectedFile(null);
+      setFilePreview(null);
+      setIsUploading(false);
     } catch (error) {
       console.error('Error creating document:', error);
       // Error toast is handled by the context
@@ -737,7 +799,7 @@ export const Purchases = () => {
 
   const getStatusBadge = (status: string) => {
     const formatStatus = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ');
-    
+
     switch (status) {
       case 'paid':
         return <StatusBadge status="success">{t('status.paid')}</StatusBadge>;
@@ -751,26 +813,26 @@ export const Purchases = () => {
         return <StatusBadge status="success">{t('status.current')}</StatusBadge>;
       case 'accepted':
         return <StatusBadge status="success">{t('status.accepted')}</StatusBadge>;
-      
+
       case 'pending':
         return <StatusBadge status="warning">{t('status.pending')}</StatusBadge>;
       case 'draft':
         return <StatusBadge status="warning">{t('status.draft')}</StatusBadge>;
-      
+
       case 'in_transit':
         return <StatusBadge status="info">{t('status.inTransit')}</StatusBadge>;
       case 'sent':
         return <StatusBadge status="info">{t('status.sent')}</StatusBadge>;
       case 'shipped':
         return <StatusBadge status="info">{t('status.shipped')}</StatusBadge>;
-      
+
       case 'overdue':
         return <StatusBadge status="danger">{t('status.overdue')}</StatusBadge>;
       case 'cancelled':
         return <StatusBadge status="danger">{t('status.cancelled')}</StatusBadge>;
       case 'expired':
         return <StatusBadge status="danger">{t('status.expired')}</StatusBadge>;
-      
+
       default:
         return <StatusBadge status="default">{formatStatus(status)}</StatusBadge>;
     }
@@ -835,9 +897,9 @@ export const Purchases = () => {
             {availableStatuses.map((status) => {
               const isSelected = doc.status === status;
               return (
-                <SelectItem 
-                  key={status} 
-                  value={status} 
+                <SelectItem
+                  key={status}
+                  value={status}
                   className="cursor-pointer py-2.5 pl-3 pr-8 hover:bg-muted/50 [&>span:first-child]:hidden"
                 >
                   <div className="flex items-center justify-between w-full gap-2">
@@ -863,7 +925,7 @@ export const Purchases = () => {
 
   const filteredDocuments = getAllDocuments().filter(doc => {
     const matchesSearch = doc.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doc.id.toLowerCase().includes(searchQuery.toLowerCase());
+      doc.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -992,29 +1054,29 @@ export const Purchases = () => {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="bg-section border border-border rounded-lg grid grid-cols-4 w-full p-1.5 gap-1.5">
-          <TabsTrigger 
-            value="purchase_order" 
+          <TabsTrigger
+            value="purchase_order"
             className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
           >
             <ShoppingCart className="w-4 h-4" />
             {t('documents.purchaseOrder')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="delivery_note" 
+          <TabsTrigger
+            value="delivery_note"
             className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
           >
             <Package className="w-4 h-4" />
             {t('documents.deliveryNote')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="invoice" 
+          <TabsTrigger
+            value="invoice"
             className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
           >
             <Receipt className="w-4 h-4" />
             {t('documents.purchaseInvoice')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="statement" 
+          <TabsTrigger
+            value="statement"
             className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
           >
             <FileCheck className="w-4 h-4" />
@@ -1026,15 +1088,15 @@ export const Purchases = () => {
         <TabsContent value="purchase_order" className="space-y-6">
           <Tabs defaultValue="create" className="space-y-6">
             <TabsList className="bg-section border border-border rounded-lg p-1.5 gap-1.5">
-              <TabsTrigger 
-                value="create" 
+              <TabsTrigger
+                value="create"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <Plus className="w-4 h-4" />
                 {t('documents.createPurchaseOrder')}
               </TabsTrigger>
-              <TabsTrigger 
-                value="list" 
+              <TabsTrigger
+                value="list"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <FileText className="w-4 h-4" />
@@ -1152,7 +1214,7 @@ export const Purchases = () => {
                       ))}
                     </div>
                   </div>
-                  
+
                   {/* Note Section */}
                   <div className="card-elevated p-6">
                     <div className="space-y-2">
@@ -1211,31 +1273,31 @@ export const Purchases = () => {
 
             <TabsContent value="list" className="animate-fade-in">
               <div className="space-y-4">
-      <div className="card-elevated p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder={t('purchases.searchByOrderOrSupplier', { defaultValue: 'Search by order # or supplier...' })}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder={t('common.status')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('documents.allStatus')}</SelectItem>
-              <SelectItem value="pending">{t('status.pending')}</SelectItem>
-              <SelectItem value="shipped">{t('status.shipped')}</SelectItem>
-              <SelectItem value="received">{t('status.received')}</SelectItem>
-              <SelectItem value="cancelled">{t('status.cancelled')}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+                <div className="card-elevated p-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder={t('purchases.searchByOrderOrSupplier', { defaultValue: 'Search by order # or supplier...' })}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder={t('common.status')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t('documents.allStatus')}</SelectItem>
+                        <SelectItem value="pending">{t('status.pending')}</SelectItem>
+                        <SelectItem value="shipped">{t('status.shipped')}</SelectItem>
+                        <SelectItem value="received">{t('status.received')}</SelectItem>
+                        <SelectItem value="cancelled">{t('status.cancelled')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
                 {selectedDocuments.size > 0 && (
                   <div className="card-elevated p-4 flex items-center justify-between">
@@ -1274,10 +1336,10 @@ export const Purchases = () => {
                   </div>
                 )}
 
-      <div className="card-elevated overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="data-table-header hover:bg-section">
+                <div className="card-elevated overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="data-table-header hover:bg-section">
                         <TableHead className="w-[70px] min-w-[70px] px-3 text-center">
                           <div className="flex items-center justify-center w-full">
                             <Checkbox
@@ -1287,16 +1349,16 @@ export const Purchases = () => {
                             />
                           </div>
                         </TableHead>
-              <TableHead>{t('documents.orderNumber')}</TableHead>
-              <TableHead>{t('documents.supplier')}</TableHead>
-              <TableHead>{t('common.date')}</TableHead>
-              <TableHead className="text-center">{t('documents.items')}</TableHead>
-              <TableHead className="text-right">{t('documents.totalTTC')}</TableHead>
-              <TableHead className="text-center">{t('common.status')}</TableHead>
-              <TableHead className="text-center">{t('common.actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+                        <TableHead>{t('documents.orderNumber')}</TableHead>
+                        <TableHead>{t('documents.supplier')}</TableHead>
+                        <TableHead>{t('common.date')}</TableHead>
+                        <TableHead className="text-center">{t('documents.items')}</TableHead>
+                        <TableHead className="text-right">{t('documents.totalTTC')}</TableHead>
+                        <TableHead className="text-center">{t('common.status')}</TableHead>
+                        <TableHead className="text-center">{t('common.actions')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {filteredDocuments.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={8} className="text-center py-8 text-muted-foreground" align="center">
@@ -1305,8 +1367,8 @@ export const Purchases = () => {
                         </TableRow>
                       ) : (
                         filteredDocuments.map((order) => (
-                          <TableRow 
-                            key={order.id} 
+                          <TableRow
+                            key={order.id}
                             className={cn(
                               "hover:bg-section/50",
                               selectedDocuments.has(order.id) && "bg-primary/5"
@@ -1330,46 +1392,46 @@ export const Purchases = () => {
                               {renderStatusSelect(order)}
                             </TableCell>
                             <TableCell className="w-[180px]">
-                  <div className="flex items-center justify-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleViewDocument(order)}
                                   title={t('common.view')}
                                 >
                                   <Eye className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleEditDocument(order)}
                                   title={t('common.edit')}
                                 >
                                   <Edit className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleDownloadPDF(order)}
                                   title={t('documents.downloadPDF')}
                                 >
                                   <Download className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8 text-destructive hover:text-destructive"
                                   onClick={() => handleDeleteDocument(order)}
                                   title={t('common.delete')}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
+                              </div>
+                            </TableCell>
+                          </TableRow>
                         ))
                       )}
                     </TableBody>
@@ -1384,15 +1446,15 @@ export const Purchases = () => {
         <TabsContent value="delivery_note" className="space-y-6">
           <Tabs defaultValue="create" className="space-y-6">
             <TabsList className="bg-section border border-border rounded-lg p-1.5 gap-1.5">
-              <TabsTrigger 
-                value="create" 
+              <TabsTrigger
+                value="create"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <Plus className="w-4 h-4" />
                 {t('documents.createDeliveryNote')}
               </TabsTrigger>
-              <TabsTrigger 
-                value="list" 
+              <TabsTrigger
+                value="list"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <FileText className="w-4 h-4" />
@@ -1654,8 +1716,8 @@ export const Purchases = () => {
                         </TableRow>
                       ) : (
                         filteredDocuments.map((doc) => (
-                          <TableRow 
-                            key={doc.id} 
+                          <TableRow
+                            key={doc.id}
                             className={cn(
                               "hover:bg-section/50",
                               selectedDocuments.has(doc.id) && "bg-primary/5"
@@ -1682,45 +1744,45 @@ export const Purchases = () => {
                             </TableCell>
                             <TableCell className="w-[220px]">
                               <div className="flex items-center justify-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleViewDocument(doc)}
                                   title={t('common.view')}
                                 >
                                   <Eye className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleEditDocument(doc)}
                                   title={t('common.edit')}
                                 >
                                   <Edit className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleDownloadPDF(doc)}
                                   title={t('documents.downloadPDF')}
                                 >
                                   <Download className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handlePrintPDF(doc)}
                                   title={t('common.print', { defaultValue: 'Print' })}
                                 >
                                   <Printer className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8 text-destructive hover:text-destructive"
                                   onClick={() => handleDeleteDocument(doc)}
                                   title={t('common.delete')}
@@ -1732,9 +1794,9 @@ export const Purchases = () => {
                           </TableRow>
                         ))
                       )}
-          </TableBody>
-        </Table>
-      </div>
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
@@ -1744,15 +1806,15 @@ export const Purchases = () => {
         <TabsContent value="invoice" className="space-y-6">
           <Tabs defaultValue="create" className="space-y-6">
             <TabsList className="bg-section border border-border rounded-lg p-1.5 gap-1.5">
-              <TabsTrigger 
-                value="create" 
+              <TabsTrigger
+                value="create"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <Plus className="w-4 h-4" />
                 {t('documents.createPurchaseInvoice', { defaultValue: 'Create Purchase Invoice' })}
               </TabsTrigger>
-              <TabsTrigger 
-                value="list" 
+              <TabsTrigger
+                value="list"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <FileText className="w-4 h-4" />
@@ -1786,8 +1848,41 @@ export const Purchases = () => {
                         <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
                       </div>
                       <div className="space-y-2">
-                        <Label>{t('documents.invoiceNumber')}</Label>
-                        <Input placeholder={t('common.autoGenerated')} disabled />
+                        <div className="flex items-center justify-between">
+                          <Label>{t('documents.invoiceNumber')}</Label>
+                          {isManualId ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setIsManualId(false);
+                                setManualDocumentId('');
+                              }}
+                              className="h-6 text-xs"
+                            >
+                              {t('common.autoGenerate', { defaultValue: 'Auto-generate' })}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsManualId(true)}
+                              className="h-6 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              {t('common.manualEntry', { defaultValue: 'Manual Entry' })}
+                            </Button>
+                          )}
+                        </div>
+                        {isManualId ? (
+                          <Input
+                            placeholder={t('documents.enterInvoiceNumber', { defaultValue: 'Enter invoice number' })}
+                            value={manualDocumentId}
+                            onChange={(e) => setManualDocumentId(e.target.value)}
+                            className="bg-background"
+                          />
+                        ) : (
+                          <Input placeholder={t('common.autoGenerated')} disabled />
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>{t('documents.dueDate')}</Label>
@@ -1806,6 +1901,20 @@ export const Purchases = () => {
                           </SelectContent>
                         </Select>
                       </div>
+                      {formPaymentMethod === 'check' && (
+                        <div className="space-y-2 md:col-span-2 p-4 bg-muted/40 rounded-lg border border-border">
+                          <Label className="font-medium flex items-center gap-2">
+                            <Receipt className="w-4 h-4 text-primary" />
+                            {t('documents.checkNumber', { defaultValue: 'Check Number' })}
+                          </Label>
+                          <Input
+                            placeholder="Enter check number"
+                            value={formCheckNumber}
+                            onChange={(e) => setFormCheckNumber(e.target.value)}
+                            className="bg-background"
+                          />
+                        </div>
+                      )}
                       <div className="space-y-2 md:col-span-2">
                         <Label>{t('purchases.referenceDocuments', { defaultValue: 'Reference Documents' })}</Label>
                         <Select>
@@ -1817,6 +1926,63 @@ export const Purchases = () => {
                             <SelectItem value="dn1">DN-2024-001</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div className="space-y-2 md:col-span-2 p-4 bg-muted/40 rounded-lg border border-border">
+                        <Label className="font-medium flex items-center gap-2 mb-2">
+                          <Paperclip className="w-4 h-4 text-primary" />
+                          {t('common.attachment', { defaultValue: 'Attachment' })} (Image/PDF)
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            key={selectedFile ? 'file-selected' : 'file-empty'}
+                            type="file"
+                            accept="image/*,application/pdf"
+                            className="cursor-pointer bg-background"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setSelectedFile(file);
+                                if (file.type.startsWith('image/')) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setFilePreview(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                } else {
+                                  setFilePreview(null);
+                                }
+                              }
+                            }}
+                          />
+                          {selectedFile && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedFile(null);
+                                setFilePreview(null);
+                              }}
+                              className="text-destructive hover:text-destructive shrink-0"
+                            >
+                              <FileX className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                        {selectedFile && (
+                          <div className="mt-2 text-sm text-muted-foreground flex items-start gap-3 p-2 bg-background rounded-md border border-border shadow-sm">
+                            {filePreview ? (
+                              <img src={filePreview} alt="Preview" className="h-12 w-12 object-cover rounded-md border" />
+                            ) : (
+                              <div className="h-12 w-12 bg-muted rounded-md border flex items-center justify-center shrink-0">
+                                <FileText className="w-6 h-6 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium truncate text-foreground">{selectedFile.name}</p>
+                              <p className="text-xs text-muted-foreground">{(selectedFile.size / 1024).toFixed(2)} KB</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2028,8 +2194,8 @@ export const Purchases = () => {
                         </TableRow>
                       ) : (
                         filteredDocuments.map((doc) => (
-                          <TableRow 
-                            key={doc.id} 
+                          <TableRow
+                            key={doc.id}
                             className={cn(
                               "hover:bg-section/50",
                               selectedDocuments.has(doc.id) && "bg-primary/5"
@@ -2057,45 +2223,45 @@ export const Purchases = () => {
                             </TableCell>
                             <TableCell className="w-[220px]">
                               <div className="flex items-center justify-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleViewDocument(doc)}
                                   title={t('common.view')}
                                 >
                                   <Eye className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleEditDocument(doc)}
                                   title={t('common.edit')}
                                 >
                                   <Edit className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleDownloadPDF(doc)}
                                   title={t('documents.downloadPDF')}
                                 >
                                   <Download className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handlePrintPDF(doc)}
                                   title={t('common.print', { defaultValue: 'Print' })}
                                 >
                                   <Printer className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8 text-destructive hover:text-destructive"
                                   onClick={() => handleDeleteDocument(doc)}
                                   title={t('common.delete')}
@@ -2119,15 +2285,15 @@ export const Purchases = () => {
         <TabsContent value="statement" className="space-y-6">
           <Tabs defaultValue="statistics" className="space-y-6">
             <TabsList className="bg-section border border-border rounded-lg p-1.5 gap-1.5">
-              <TabsTrigger 
-                value="statistics" 
+              <TabsTrigger
+                value="statistics"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <TrendingUp className="w-4 h-4" />
                 {t('purchases.invoiceStatistics', { defaultValue: 'Invoice Statistics' })}
               </TabsTrigger>
-              <TabsTrigger 
-                value="list" 
+              <TabsTrigger
+                value="list"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <FileText className="w-4 h-4" />
@@ -2572,8 +2738,8 @@ export const Purchases = () => {
                         </TableRow>
                       ) : (
                         filteredDocuments.map((doc) => (
-                          <TableRow 
-                            key={doc.id} 
+                          <TableRow
+                            key={doc.id}
                             className={cn(
                               "hover:bg-section/50",
                               selectedDocuments.has(doc.id) && "bg-primary/5"
@@ -2599,45 +2765,45 @@ export const Purchases = () => {
                             </TableCell>
                             <TableCell className="w-[220px]">
                               <div className="flex items-center justify-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleViewDocument(doc)}
                                   title="View"
                                 >
                                   <Eye className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleEditDocument(doc)}
                                   title="Edit"
                                 >
                                   <Edit className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handleDownloadPDF(doc)}
                                   title="Download PDF"
                                 >
                                   <Download className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8"
                                   onClick={() => handlePrintPDF(doc)}
                                   title="Print"
                                 >
                                   <Printer className="w-4 h-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8 text-destructive hover:text-destructive"
                                   onClick={() => handleDeleteDocument(doc)}
                                   title="Delete"
@@ -2728,15 +2894,15 @@ export const Purchases = () => {
                 )}
               </div>
               <DialogFooter>
-                  <Button variant="outline" onClick={() => setViewingDocument(null)}>Close</Button>
-                  <Button onClick={() => {
-                    setViewingDocument(null);
-                    handleEditDocument(viewingDocument);
-                  }}>Edit</Button>
-                  <Button variant="outline" className="gap-2" onClick={() => handleDownloadPDF(viewingDocument)}>
-                    <Download className="w-4 h-4" />
-                    Download PDF
-                  </Button>
+                <Button variant="outline" onClick={() => setViewingDocument(null)}>Close</Button>
+                <Button onClick={() => {
+                  setViewingDocument(null);
+                  handleEditDocument(viewingDocument);
+                }}>Edit</Button>
+                <Button variant="outline" className="gap-2" onClick={() => handleDownloadPDF(viewingDocument)}>
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </Button>
               </DialogFooter>
             </>
           )}

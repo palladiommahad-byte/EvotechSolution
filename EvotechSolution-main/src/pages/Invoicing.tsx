@@ -47,13 +47,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { ToastAction } from '@/components/ui/toast';
+
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatMAD, VAT_RATE, calculateInvoiceTotals } from '@/lib/moroccan-utils';
 import { ProductSearch } from '@/components/ui/product-search';
 import { Product } from '@/lib/products';
 import { useProducts } from '@/contexts/ProductsContext';
 import { CurrencyDisplay } from '@/components/ui/CurrencyDisplay';
-import { useContacts, Contact } from '@/contexts/ContactsContext';
+import { useContacts, UIContact } from '@/contexts/ContactsContext';
 import { useSales } from '@/contexts/SalesContext';
 import { usePurchases } from '@/contexts/PurchasesContext';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -88,8 +90,8 @@ interface InvoiceDocument {
   id: string;
   client?: string;
   supplier?: string;
-  clientData?: Contact; // Full client information from CRM
-  supplierData?: Contact; // Full supplier information from CRM
+  clientData?: UIContact; // Full client information from CRM
+  supplierData?: UIContact; // Full supplier information from CRM
   date: string;
   items: number | InvoiceItem[]; // Can be count or full items array
   total: number;
@@ -108,7 +110,7 @@ export const Invoicing = () => {
   const { products = [] } = useProducts();
   const { companyInfo } = useCompany();
   const { toast } = useToast();
-  
+
   // Use contexts for real data
   const {
     invoices,
@@ -129,7 +131,7 @@ export const Invoicing = () => {
     updateDivers,
     createDivers,
   } = useSales();
-  
+
   const {
     purchaseOrders,
     purchaseInvoices,
@@ -141,7 +143,7 @@ export const Invoicing = () => {
     updatePurchaseInvoice,
     createPurchaseInvoice,
   } = usePurchases();
-  
+
   // Convert SalesDocument to InvoiceDocument format for compatibility
   const convertToInvoiceDocument = (doc: any): InvoiceDocument => ({
     id: doc.id || doc.documentId,
@@ -156,7 +158,7 @@ export const Invoicing = () => {
     note: doc.note,
     dueDate: doc.dueDate,
   });
-  
+
   // Convert PurchaseDocument to InvoiceDocument format
   const convertPurchaseToInvoiceDocument = (doc: any): InvoiceDocument => ({
     id: doc.id || doc.documentId,
@@ -171,7 +173,7 @@ export const Invoicing = () => {
     note: doc.note,
     dueDate: doc.dueDate,
   });
-  
+
   // Map context data to InvoiceDocument format
   const mockFactures = invoices.map(convertToInvoiceDocument);
   const mockEstimates = estimates.map(convertToInvoiceDocument);
@@ -265,10 +267,10 @@ export const Invoicing = () => {
         newSet.delete(deletingDocument.id);
         return newSet;
       });
-      
+
       const docTypeName = documentTypeNames[deletingDocument.type] || 'Document';
       setDeletingDocument(null);
-      
+
       toast({
         title: "Document Deleted",
         description: `${docTypeName} "${deletingDocument.id}" has been deleted successfully.`,
@@ -337,7 +339,7 @@ export const Invoicing = () => {
       const count = successCount;
       const docTypeName = documentTypeNames[activeTab] || 'Documents';
       setSelectedDocuments(new Set());
-      
+
       if (successCount > 0) {
         toast({
           title: "Documents Deleted",
@@ -363,13 +365,13 @@ export const Invoicing = () => {
   const handleDownloadPDF = async (doc: InvoiceDocument & { items?: any }) => {
     try {
       const docType = doc.type || activeTab;
-      
+
       // If clientData/supplierData is missing, try to find it from CRM using client/supplier name
       let docWithClientData = { ...doc };
       if (!docWithClientData.clientData && docWithClientData.client) {
         // Try to find client by matching company or name
-        const foundClient = clients.find(c => 
-          c.company === docWithClientData.client || 
+        const foundClient = clients.find(c =>
+          c.company === docWithClientData.client ||
           c.name === docWithClientData.client
         );
         if (foundClient) {
@@ -378,15 +380,15 @@ export const Invoicing = () => {
       }
       if (!docWithClientData.supplierData && docWithClientData.supplier) {
         // Try to find supplier by matching company or name
-        const foundSupplier = suppliers.find(s => 
-          s.company === docWithClientData.supplier || 
+        const foundSupplier = suppliers.find(s =>
+          s.company === docWithClientData.supplier ||
           s.name === docWithClientData.supplier
         );
         if (foundSupplier) {
           docWithClientData.supplierData = foundSupplier;
         }
       }
-      
+
       // Prepare document data with items if available
       const docWithItems = {
         ...docWithClientData,
@@ -419,12 +421,12 @@ export const Invoicing = () => {
   const handlePrintPDF = async (doc: InvoiceDocument & { items?: any }) => {
     try {
       const docType = doc.type || activeTab;
-      
+
       // If clientData/supplierData is missing, try to find it from CRM using client/supplier name
       let docWithClientData = { ...doc };
       if (!docWithClientData.clientData && docWithClientData.client) {
-        const foundClient = clients.find(c => 
-          c.company === docWithClientData.client || 
+        const foundClient = clients.find(c =>
+          c.company === docWithClientData.client ||
           c.name === docWithClientData.client
         );
         if (foundClient) {
@@ -432,15 +434,15 @@ export const Invoicing = () => {
         }
       }
       if (!docWithClientData.supplierData && docWithClientData.supplier) {
-        const foundSupplier = suppliers.find(s => 
-          s.company === docWithClientData.supplier || 
+        const foundSupplier = suppliers.find(s =>
+          s.company === docWithClientData.supplier ||
           s.name === docWithClientData.supplier
         );
         if (foundSupplier) {
           docWithClientData.supplierData = foundSupplier;
         }
       }
-      
+
       // Prepare document data with items if available
       const docWithItems = {
         ...docWithClientData,
@@ -452,8 +454,8 @@ export const Invoicing = () => {
       const { pdf } = await import('@react-pdf/renderer');
       const React = await import('react');
       const { DocumentPDFTemplate } = await import('@/components/documents/DocumentPDFTemplate');
-      const items = Array.isArray(docWithItems.items) 
-        ? docWithItems.items 
+      const items = Array.isArray(docWithItems.items)
+        ? docWithItems.items
         : []; // Use actual items from document, no mock items
 
       // Create PDF document using company info from context
@@ -475,7 +477,7 @@ export const Invoicing = () => {
       // Generate PDF blob
       const blob = await pdf(pdfDoc).toBlob();
       const url = URL.createObjectURL(blob);
-      
+
       // Open PDF in new window and trigger print dialog
       const printWindow = window.open(url, '_blank');
       if (printWindow) {
@@ -522,25 +524,35 @@ export const Invoicing = () => {
 
   const handleDownloadExcel = (doc: InvoiceDocument) => {
     const docType = doc.type || activeTab;
-    generateDocumentExcel(doc, docType);
+    const itemsCount = Array.isArray(doc.items) ? doc.items.length : (doc.items || 0);
+    generateDocumentExcel({ ...doc, items: itemsCount }, docType);
   };
 
   const handleBulkExportExcel = () => {
     const documentsToExport = filteredDocuments.filter(doc => selectedDocuments.has(doc.id));
     if (documentsToExport.length > 0) {
-      generateBulkDocumentsExcel(documentsToExport, activeTab);
+      const mappedDocs = documentsToExport.map(doc => ({
+        ...doc,
+        items: Array.isArray(doc.items) ? doc.items.length : (doc.items || 0)
+      }));
+      generateBulkDocumentsExcel(mappedDocs as any, activeTab);
     }
   };
 
   const handleDownloadCSV = (doc: InvoiceDocument) => {
     const docType = doc.type || activeTab;
-    generateDocumentCSV(doc, docType);
+    const itemsCount = Array.isArray(doc.items) ? doc.items.length : (doc.items || 0);
+    generateDocumentCSV({ ...doc, items: itemsCount }, docType);
   };
 
   const handleBulkExportCSV = () => {
     const documentsToExport = filteredDocuments.filter(doc => selectedDocuments.has(doc.id));
     if (documentsToExport.length > 0) {
-      generateBulkDocumentsCSV(documentsToExport, activeTab);
+      const mappedDocs = documentsToExport.map(doc => ({
+        ...doc,
+        items: Array.isArray(doc.items) ? doc.items.length : (doc.items || 0)
+      }));
+      generateBulkDocumentsCSV(mappedDocs as any, activeTab);
     }
   };
 
@@ -673,7 +685,7 @@ export const Invoicing = () => {
 
     const isPurchase = documentType === 'purchase_order';
     const entityId = isPurchase ? formSupplier : formClient;
-    
+
     if (!entityId) {
       toast({
         title: "Validation Error",
@@ -684,8 +696,8 @@ export const Invoicing = () => {
     }
 
     // Get full client/supplier data from CRM
-    const contactData = isPurchase 
-      ? getSupplierById(entityId) 
+    const contactData = isPurchase
+      ? getSupplierById(entityId)
       : getClientById(entityId);
 
     // Generate unique document number using database function
@@ -695,10 +707,10 @@ export const Invoicing = () => {
       const { generateDocumentNumberFromDB } = await import('@/lib/document-number-service');
       documentNumber = await generateDocumentNumberFromDB(
         documentType === 'invoice' ? 'invoice' :
-        documentType === 'estimate' ? 'estimate' :
-        documentType === 'purchase_order' ? 'purchase_order' :
-        documentType === 'delivery_note' ? 'delivery_note' :
-        'statement',
+          documentType === 'estimate' ? 'estimate' :
+            documentType === 'purchase_order' ? 'purchase_order' :
+              documentType === 'delivery_note' ? 'delivery_note' :
+                'statement',
         formDate
       );
     } catch (error) {
@@ -713,10 +725,10 @@ export const Invoicing = () => {
       ];
       documentNumber = generateDocumentNumber(
         documentType === 'invoice' ? 'invoice' :
-        documentType === 'estimate' ? 'estimate' :
-        documentType === 'purchase_order' ? 'purchase_order' :
-        documentType === 'delivery_note' ? 'delivery_note' :
-        'statement',
+          documentType === 'estimate' ? 'estimate' :
+            documentType === 'purchase_order' ? 'purchase_order' :
+              documentType === 'delivery_note' ? 'delivery_note' :
+                'statement',
         allExistingDocuments,
         formDate
       );
@@ -724,6 +736,7 @@ export const Invoicing = () => {
 
     try {
       const documentData = {
+        documentId: documentNumber,
         client: isPurchase ? undefined : entityId,
         supplier: isPurchase ? entityId : undefined,
         date: formDate,
@@ -766,25 +779,39 @@ export const Invoicing = () => {
       setFormPaymentMethod('cash');
       setFormNote('');
       setFormDueDate('');
-      
+
       toast({
         title: "Document Created",
         description: "Document has been created successfully.",
       });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to create document: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive",
-      });
+      console.error('Error creating document:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // Check if it's a stock validation error
+      if (errorMessage.includes('Insufficient stock')) {
+        toast({
+          title: "Stock Validation Error",
+          description: errorMessage,
+          variant: "destructive",
+          duration: Infinity, // Persistent
+          action: <ToastAction altText="OK">OK</ToastAction>,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to create document: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
     }
-    
+
     toast({
       title: t('documents.documentCreated', { defaultValue: 'Document Created' }),
-      description: t('documents.documentCreatedDescription', { 
-        documentType: getDocumentTitle(), 
-        documentId: newDocument.id,
-        defaultValue: `${getDocumentTitle()} "${newDocument.id}" has been created successfully.`
+      description: t('documents.documentCreatedDescription', {
+        documentType: getDocumentTitle(),
+        documentId: documentNumber,
+        defaultValue: `${getDocumentTitle()} "${documentNumber}" has been created successfully.`
       }),
     });
   };
@@ -792,15 +819,15 @@ export const Invoicing = () => {
   const handlePreviewPDF = async () => {
     const isPurchase = documentType === 'purchase_order';
     const entityId = isPurchase ? formSupplier : formClient;
-    
+
     if (!entityId) {
       alert(`Please select a ${isPurchase ? 'supplier' : 'client'}.`);
       return;
     }
 
     // Get full client/supplier data from CRM
-    const contactData = isPurchase 
-      ? getSupplierById(entityId) 
+    const contactData = isPurchase
+      ? getSupplierById(entityId)
       : getClientById(entityId);
 
     const previewDocument: InvoiceDocument & { items?: any } = {
@@ -853,7 +880,7 @@ export const Invoicing = () => {
 
   const getStatusBadge = (status: string) => {
     const formatStatus = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ');
-    
+
     switch (status) {
       case 'paid':
         return <StatusBadge status="success">{t('status.paid')}</StatusBadge>;
@@ -867,26 +894,26 @@ export const Invoicing = () => {
         return <StatusBadge status="success">{t('status.current')}</StatusBadge>;
       case 'accepted':
         return <StatusBadge status="success">{t('status.accepted')}</StatusBadge>;
-      
+
       case 'pending':
         return <StatusBadge status="warning">{t('status.pending')}</StatusBadge>;
       case 'draft':
         return <StatusBadge status="warning">{t('status.draft')}</StatusBadge>;
-      
+
       case 'in_transit':
         return <StatusBadge status="info">{t('status.inTransit')}</StatusBadge>;
       case 'sent':
         return <StatusBadge status="info">{t('status.sent')}</StatusBadge>;
       case 'shipped':
         return <StatusBadge status="info">{t('status.shipped')}</StatusBadge>;
-      
+
       case 'overdue':
         return <StatusBadge status="danger">{t('status.overdue')}</StatusBadge>;
       case 'cancelled':
         return <StatusBadge status="danger">{t('status.cancelled')}</StatusBadge>;
       case 'expired':
         return <StatusBadge status="danger">{t('status.expired')}</StatusBadge>;
-      
+
       default:
         return <StatusBadge status="default">{formatStatus(status)}</StatusBadge>;
     }
@@ -937,7 +964,7 @@ export const Invoicing = () => {
           });
           return;
       }
-      
+
       toast({
         title: "Status Updated",
         description: "Document status has been updated successfully.",
@@ -968,9 +995,9 @@ export const Invoicing = () => {
             {availableStatuses.map((status) => {
               const isSelected = doc.status === status;
               return (
-                <SelectItem 
-                  key={status} 
-                  value={status} 
+                <SelectItem
+                  key={status}
+                  value={status}
                   className="cursor-pointer py-2.5 pl-3 pr-8 hover:bg-muted/50 [&>span:first-child]:hidden"
                 >
                   <div className="flex items-center justify-between w-full gap-2">
@@ -1002,7 +1029,7 @@ export const Invoicing = () => {
 
   const filteredDocuments = getAllDocuments().filter(doc => {
     const matchesSearch = (doc.client || doc.supplier || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doc.id.toLowerCase().includes(searchQuery.toLowerCase());
+      doc.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -1086,8 +1113,8 @@ export const Invoicing = () => {
               </div>
               <div className="space-y-2">
                 <Label>{t('documents.documentDate', { defaultValue: 'Document Date' })}</Label>
-                <Input 
-                  type="date" 
+                <Input
+                  type="date"
                   value={formDate}
                   onChange={(e) => setFormDate(e.target.value)}
                 />
@@ -1135,7 +1162,7 @@ export const Invoicing = () => {
                     <div className="col-span-5">
                       <Label className="text-xs font-medium mb-1.5 block">Product (Optional)</Label>
                       <ProductSearch
-                                products={products}
+                        products={products}
                         value={item.productId}
                         onSelect={(product) => handleProductSelect(item.id, product)}
                         placeholder="Search product..."
@@ -1194,7 +1221,7 @@ export const Invoicing = () => {
               ))}
             </div>
           </div>
-          
+
           {/* Note Section */}
           <div className="card-elevated p-6">
             <div className="space-y-2">
@@ -1323,20 +1350,20 @@ export const Invoicing = () => {
                     <ChevronDown className="w-3 h-3" />
                   </Button>
                 </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleBulkExportPDF} disabled={selectedDocuments.size === 0}>
-                <FileText className="w-4 h-4 mr-2" />
-                {t('documents.exportAsPDF')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleBulkExportExcel} disabled={selectedDocuments.size === 0}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                {t('documents.exportAsExcel')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleBulkExportCSV} disabled={selectedDocuments.size === 0}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                {t('documents.exportAsCSV')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleBulkExportPDF} disabled={selectedDocuments.size === 0}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    {t('documents.exportAsPDF')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleBulkExportExcel} disabled={selectedDocuments.size === 0}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    {t('documents.exportAsExcel')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleBulkExportCSV} disabled={selectedDocuments.size === 0}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    {t('documents.exportAsCSV')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
@@ -1375,13 +1402,13 @@ export const Invoicing = () => {
                 </TableRow>
               ) : (
                 filteredDocuments.map((doc) => (
-                  <TableRow 
-                    key={doc.id} 
+                  <TableRow
+                    key={doc.id}
                     className={cn(
                       "hover:bg-section/50",
                       selectedDocuments.has(doc.id) && "bg-primary/5"
                     )}
-                    >
+                  >
                     <TableCell className="w-[70px] min-w-[70px] px-3 text-center">
                       <div className="flex items-center justify-center w-full">
                         <Checkbox
@@ -1410,45 +1437,45 @@ export const Invoicing = () => {
                     </TableCell>
                     <TableCell className="w-[180px]">
                       <div className="flex items-center justify-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8"
                           onClick={() => handleViewDocument(doc)}
                           title={t('common.view')}
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8"
                           onClick={() => handleEditDocument(doc)}
                           title={t('common.edit')}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8"
                           onClick={() => handleDownloadPDF(doc)}
                           title={t('documents.downloadPDF')}
                         >
                           <Download className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8"
                           onClick={() => handlePrintPDF(doc)}
                           title={t('common.print', { defaultValue: 'Print' })}
                         >
                           <Printer className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => handleDeleteDocument(doc)}
                           title={t('common.delete')}
@@ -1663,7 +1690,7 @@ export const Invoicing = () => {
               <DropdownMenuItem onClick={() => {
                 const allDocs = getAllDocuments();
                 if (allDocs.length > 0) {
-                  generateBulkDocumentsExcel(allDocs, activeTab);
+                  generateBulkDocumentsExcel(allDocs as any, activeTab);
                 }
               }}>
                 <FileText className="w-4 h-4 mr-2" />
@@ -1672,7 +1699,7 @@ export const Invoicing = () => {
               <DropdownMenuItem onClick={() => {
                 const allDocs = getAllDocuments();
                 if (allDocs.length > 0) {
-                  generateBulkDocumentsCSV(allDocs, activeTab);
+                  generateBulkDocumentsCSV(allDocs as any, activeTab);
                 }
               }}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
@@ -1735,36 +1762,36 @@ export const Invoicing = () => {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="bg-section border border-border rounded-lg grid grid-cols-5 w-full p-1.5 gap-1.5">
-          <TabsTrigger 
-            value="invoice" 
+          <TabsTrigger
+            value="invoice"
             className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
           >
             <Receipt className="w-4 h-4" />
             {t('documents.invoice')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="estimate" 
+          <TabsTrigger
+            value="estimate"
             className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
           >
             <FileText className="w-4 h-4" />
             {t('documents.estimate')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="purchase_order" 
+          <TabsTrigger
+            value="purchase_order"
             className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
           >
             <ShoppingCart className="w-4 h-4" />
             {t('documents.purchaseOrder')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="delivery_note" 
+          <TabsTrigger
+            value="delivery_note"
             className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
           >
             <Package className="w-4 h-4" />
             {t('documents.deliveryNote')}
           </TabsTrigger>
-          <TabsTrigger 
-            value="statement" 
+          <TabsTrigger
+            value="statement"
             className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
           >
             <FileCheck className="w-4 h-4" />
@@ -1776,15 +1803,15 @@ export const Invoicing = () => {
           <TabsContent key={docType} value={docType} className="space-y-6 animate-fade-in">
             <Tabs defaultValue="list" className="space-y-4">
               <TabsList className="bg-section border border-border rounded-lg p-1.5 gap-1.5">
-                <TabsTrigger 
-                  value="create" 
+                <TabsTrigger
+                  value="create"
                   className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
                 >
                   <Plus className="w-4 h-4" />
                   {t('common.create')}
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="list" 
+                <TabsTrigger
+                  value="list"
                   className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
                 >
                   <FileText className="w-4 h-4" />
@@ -1807,15 +1834,15 @@ export const Invoicing = () => {
         <TabsContent value="statement" className="space-y-6">
           <Tabs defaultValue="statistics" className="space-y-6">
             <TabsList className="bg-section border border-border rounded-lg p-1.5 gap-1.5">
-              <TabsTrigger 
-                value="statistics" 
+              <TabsTrigger
+                value="statistics"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <TrendingUp className="w-4 h-4" />
                 {t('sales.invoiceStatistics')}
               </TabsTrigger>
-              <TabsTrigger 
-                value="list" 
+              <TabsTrigger
+                value="list"
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <FileText className="w-4 h-4" />

@@ -11,7 +11,7 @@ import { purchaseInvoicesService, PurchaseInvoiceWithItems } from '@/services/pu
 import { deliveryNotesService, DeliveryNoteWithItems } from '@/services/delivery-notes.service';
 import { treasuryService } from '@/services/treasury.service';
 import { useToast } from '@/hooks/use-toast';
-import { 
+import {
   mapPurchaseOrderStatus,
   mapPurchaseOrderStatusToUI,
   mapPurchaseInvoiceStatus,
@@ -52,6 +52,8 @@ export interface PurchaseDocument {
   paymentMethod?: 'cash' | 'check' | 'bank_transfer';
   dueDate?: string;
   note?: string;
+  attachment_url?: string | null;
+  checkNumber?: string;
   // Additional fields for internal use
   _internalId?: string; // database ID
 }
@@ -61,23 +63,23 @@ interface PurchasesContextType {
   purchaseOrders: PurchaseDocument[];
   purchaseInvoices: PurchaseDocument[];
   deliveryNotes: PurchaseDocument[];
-  
+
   // Loading state
   isLoading: boolean;
-  
+
   // CRUD operations
   createPurchaseOrder: (data: Omit<PurchaseDocument, 'id' | 'type'>) => Promise<void>;
   updatePurchaseOrder: (id: string, data: Partial<PurchaseDocument>) => Promise<void>;
   deletePurchaseOrder: (id: string) => Promise<void>;
-  
+
   createPurchaseInvoice: (data: Omit<PurchaseDocument, 'id' | 'type'>) => Promise<void>;
   updatePurchaseInvoice: (id: string, data: Partial<PurchaseDocument>) => Promise<void>;
   deletePurchaseInvoice: (id: string) => Promise<void>;
-  
+
   createDeliveryNote: (data: Omit<PurchaseDocument, 'id' | 'type'>) => Promise<void>;
   updateDeliveryNote: (id: string, data: Partial<PurchaseDocument>) => Promise<void>;
   deleteDeliveryNote: (id: string) => Promise<void>;
-  
+
   // Refresh data
   refreshAll: () => Promise<void>;
 }
@@ -113,6 +115,7 @@ const purchaseInvoiceToPurchaseDocument = (pi: PurchaseInvoiceWithItems): Purcha
   supplier: pi.supplier?.name || pi.supplier_id,
   supplierData: pi.supplier,
   date: pi.date,
+  attachment_url: pi.attachment_url || null,
   items: pi.items.map(item => ({
     id: item.id,
     productId: item.product_id || undefined,
@@ -200,17 +203,17 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     mutationFn: async (data: Omit<PurchaseDocument, 'id' | 'type'>) => {
       // Validate and get supplier UUID
       const supplierId = data.supplierData?.id || (typeof data.supplier === 'string' ? data.supplier : null);
-      
+
       if (!supplierId) {
         throw new Error('Supplier is required');
       }
-      
+
       // Validate UUID format
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(supplierId)) {
         throw new Error(`Invalid supplier ID format. Expected UUID, got: ${supplierId}. Please select a valid supplier from the database.`);
       }
-      
+
       return purchaseOrdersService.create({
         document_id: data.documentId || `PO-${Date.now()}`,
         supplier_id: supplierId,
@@ -228,18 +231,18 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: async (purchaseOrder: PurchaseOrderWithItems, variables: Omit<PurchaseDocument, 'id' | 'type'>) => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_orders'] });
-      
+
       // Automatically create treasury payment entry for the purchase order
       try {
         const supplierName = variables.supplierData?.company || variables.supplierData?.name || variables.supplier || 'Unknown Supplier';
         const paymentMethod = variables.paymentMethod || 'cash';
-        
+
         // Determine initial status based on payment method
         let initialStatus: 'in-hand' | 'pending_bank' | 'cleared' = 'in-hand';
         if (paymentMethod === 'bank_transfer') {
           initialStatus = 'pending_bank';
         }
-        
+
         await treasuryService.createPayment({
           invoice_id: purchaseOrder.document_id,
           invoice_number: purchaseOrder.document_id,
@@ -247,11 +250,11 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
           amount: purchaseOrder.subtotal, // Purchase orders don't have tax, use subtotal
           payment_method: paymentMethod,
           status: initialStatus,
-          payment_date: purchaseOrder.date,
+          date: purchaseOrder.date,
           payment_type: 'purchase',
           notes: `Auto-created from purchase order ${purchaseOrder.document_id}`,
         });
-        
+
         // Invalidate treasury queries to refresh the data
         queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
       } catch (treasuryError) {
@@ -259,16 +262,16 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         console.error('Error creating treasury payment entry:', treasuryError);
         // Still show success for purchase order creation
       }
-      
+
       toast({ title: 'Purchase order created successfully' });
     },
     onError: (error: Error) => {
       // Check if it's a duplicate key error
       if (error.message.includes('duplicate key') || error.message.includes('document_id_key')) {
-        toast({ 
-          title: 'Error creating purchase order', 
-          description: 'A document with this number already exists. Please try again.', 
-          variant: 'destructive' 
+        toast({
+          title: 'Error creating purchase order',
+          description: 'A document with this number already exists. Please try again.',
+          variant: 'destructive'
         });
         // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_orders'] });
@@ -284,7 +287,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       if (!po?._internalId) {
         throw new Error('Purchase order not found');
       }
-      
+
       const updatedOrder = await purchaseOrdersService.update(po._internalId, {
         date: data.date,
         subtotal: data.total,
@@ -305,7 +308,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
           // Update treasury payment with new order data
           const supplierName = data.supplierData?.company || data.supplierData?.name || po.supplier || 'Unknown Supplier';
           const paymentMethod = data.paymentMethod || po.paymentMethod || existingPayment.paymentMethod || 'cash';
-          
+
           await treasuryService.updatePayment(existingPayment.id, {
             entity: supplierName,
             amount: updatedOrder.subtotal,
@@ -313,7 +316,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
             payment_date: updatedOrder.date,
             notes: `Auto-updated from purchase order ${updatedOrder.document_id}`,
           });
-          
+
           queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
         }
       } catch (treasuryError) {
@@ -338,9 +341,9 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       if (!po?._internalId) {
         throw new Error('Purchase order not found');
       }
-      
+
       const orderNumber = po.documentId || po.id;
-      
+
       // Delete treasury payment first
       try {
         await treasuryService.deletePaymentByInvoiceNumber(orderNumber, 'purchase');
@@ -349,7 +352,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         // Log error but continue with order deletion
         console.error('Error deleting treasury payment:', treasuryError);
       }
-      
+
       return purchaseOrdersService.delete(po._internalId);
     },
     onSuccess: () => {
@@ -366,23 +369,23 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     mutationFn: async (data: Omit<PurchaseDocument, 'id' | 'type'>) => {
       // Validate and get supplier UUID
       const supplierId = data.supplierData?.id || (typeof data.supplier === 'string' ? data.supplier : null);
-      
+
       if (!supplierId) {
         throw new Error('Supplier is required');
       }
-      
+
       // Validate UUID format
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(supplierId)) {
         throw new Error(`Invalid supplier ID format. Expected UUID, got: ${supplierId}. Please select a valid supplier from the database.`);
       }
-      
+
       // Calculate VAT (20% for Morocco)
       const vatRate = 20.00;
       const subtotal = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
       const vatAmount = subtotal * (vatRate / 100);
       const total = subtotal + vatAmount;
-      
+
       return purchaseInvoicesService.create({
         document_id: data.documentId || `PI-${Date.now()}`,
         supplier_id: supplierId,
@@ -395,6 +398,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         payment_method: data.paymentMethod,
         status: data.status as any,
         note: data.note,
+        attachment_url: data.attachment_url,
         items: data.items.map(item => ({
           product_id: item.productId && uuidRegex.test(item.productId) ? item.productId : null,
           description: item.description,
@@ -405,18 +409,18 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: async (purchaseInvoice: PurchaseInvoiceWithItems, variables: Omit<PurchaseDocument, 'id' | 'type'>) => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_invoices'] });
-      
+
       // Automatically create treasury payment entry for the purchase invoice
       try {
         const supplierName = variables.supplierData?.company || variables.supplierData?.name || variables.supplier || 'Unknown Supplier';
         const paymentMethod = variables.paymentMethod || 'cash';
-        
+
         // Determine initial status based on payment method
         let initialStatus: 'in-hand' | 'pending_bank' | 'cleared' = 'in-hand';
         if (paymentMethod === 'bank_transfer') {
           initialStatus = 'pending_bank';
         }
-        
+
         await treasuryService.createPayment({
           invoice_id: purchaseInvoice.document_id,
           invoice_number: purchaseInvoice.document_id,
@@ -424,11 +428,11 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
           amount: purchaseInvoice.total, // Purchase invoices include tax in total
           payment_method: paymentMethod,
           status: initialStatus,
-          payment_date: purchaseInvoice.date,
+          date: purchaseInvoice.date,
           payment_type: 'purchase',
           notes: `Auto-created from purchase invoice ${purchaseInvoice.document_id} (VAT: ${purchaseInvoice.vat_amount})`,
         });
-        
+
         // Invalidate treasury queries to refresh the data
         queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
       } catch (treasuryError) {
@@ -436,16 +440,16 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         console.error('Error creating treasury payment entry:', treasuryError);
         // Still show success for purchase invoice creation
       }
-      
+
       toast({ title: 'Purchase invoice created successfully' });
     },
     onError: (error: Error) => {
       // Check if it's a duplicate key error
       if (error.message.includes('duplicate key') || error.message.includes('document_id_key')) {
-        toast({ 
-          title: 'Error creating purchase invoice', 
-          description: 'A document with this number already exists. Please try again.', 
-          variant: 'destructive' 
+        toast({
+          title: 'Error creating purchase invoice',
+          description: 'A document with this number already exists. Please try again.',
+          variant: 'destructive'
         });
         // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_invoices'] });
@@ -461,7 +465,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       if (!pi?._internalId) {
         throw new Error('Purchase invoice not found');
       }
-      
+
       // Recalculate totals if items changed
       let updateData: any = {
         date: data.date,
@@ -469,8 +473,9 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         payment_method: data.paymentMethod,
         status: data.status ? mapPurchaseInvoiceStatus(data.status) : undefined,
         note: data.note,
+        attachment_url: data.attachment_url,
       };
-      
+
       if (data.items) {
         const vatRate = 20.00;
         const subtotal = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
@@ -487,7 +492,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
           unit_price: item.unitPrice,
         }));
       }
-      
+
       const updatedInvoice = await purchaseInvoicesService.update(pi._internalId, updateData);
 
       // Sync with treasury payment
@@ -497,7 +502,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
           // Update treasury payment with new invoice data
           const supplierName = data.supplierData?.company || data.supplierData?.name || pi.supplier || 'Unknown Supplier';
           const paymentMethod = data.paymentMethod || pi.paymentMethod || existingPayment.paymentMethod || 'cash';
-          
+
           await treasuryService.updatePayment(existingPayment.id, {
             entity: supplierName,
             amount: updatedInvoice.total,
@@ -505,7 +510,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
             payment_date: updatedInvoice.date,
             notes: `Auto-updated from purchase invoice ${updatedInvoice.document_id} (VAT: ${updatedInvoice.vat_amount})`,
           });
-          
+
           queryClient.invalidateQueries({ queryKey: ['treasury', 'payments'] });
         }
       } catch (treasuryError) {
@@ -530,9 +535,9 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       if (!pi?._internalId) {
         throw new Error('Purchase invoice not found');
       }
-      
+
       const invoiceNumber = pi.documentId || pi.id;
-      
+
       // Delete treasury payment first
       try {
         await treasuryService.deletePaymentByInvoiceNumber(invoiceNumber, 'purchase');
@@ -541,7 +546,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         // Log error but continue with invoice deletion
         console.error('Error deleting treasury payment:', treasuryError);
       }
-      
+
       return purchaseInvoicesService.delete(pi._internalId);
     },
     onSuccess: () => {
@@ -560,13 +565,11 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Supplier is required');
       }
       const supplierId = data.supplierData?.id || data.supplier;
-      
+
       return deliveryNotesService.create({
         document_id: data.documentId || `DN-${Date.now()}`,
         supplier_id: supplierId,
         date: data.date,
-        subtotal: data.total,
-        status: data.status as any,
         note: data.note,
         document_type: 'delivery_note',
         items: data.items.map(item => ({
@@ -592,11 +595,9 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       if (!dn?._internalId) {
         throw new Error('Delivery note not found');
       }
-      
+
       return deliveryNotesService.update(dn._internalId, {
         date: data.date,
-        subtotal: data.total,
-        status: data.status as any,
         note: data.note,
         items: data.items?.map(item => ({
           product_id: item.productId,
@@ -638,15 +639,15 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       purchaseInvoices,
       deliveryNotes: purchaseDeliveryNotes,
       isLoading,
-      createPurchaseOrder: (data) => createPurchaseOrderMutation.mutateAsync(data),
-      updatePurchaseOrder: (id, data) => updatePurchaseOrderMutation.mutateAsync({ id, data }),
-      deletePurchaseOrder: (id) => deletePurchaseOrderMutation.mutateAsync(id),
-      createPurchaseInvoice: (data) => createPurchaseInvoiceMutation.mutateAsync(data),
-      updatePurchaseInvoice: (id, data) => updatePurchaseInvoiceMutation.mutateAsync({ id, data }),
-      deletePurchaseInvoice: (id) => deletePurchaseInvoiceMutation.mutateAsync(id),
-      createDeliveryNote: (data) => createDeliveryNoteMutation.mutateAsync(data),
-      updateDeliveryNote: (id, data) => updateDeliveryNoteMutation.mutateAsync({ id, data }),
-      deleteDeliveryNote: (id) => deleteDeliveryNoteMutation.mutateAsync(id),
+      createPurchaseOrder: async (data) => { await createPurchaseOrderMutation.mutateAsync(data); },
+      updatePurchaseOrder: async (id, data) => { await updatePurchaseOrderMutation.mutateAsync({ id, data }); },
+      deletePurchaseOrder: async (id) => { await deletePurchaseOrderMutation.mutateAsync(id); },
+      createPurchaseInvoice: async (data) => { await createPurchaseInvoiceMutation.mutateAsync(data); },
+      updatePurchaseInvoice: async (id, data) => { await updatePurchaseInvoiceMutation.mutateAsync({ id, data }); },
+      deletePurchaseInvoice: async (id) => { await deletePurchaseInvoiceMutation.mutateAsync(id); },
+      createDeliveryNote: async (data) => { await createDeliveryNoteMutation.mutateAsync(data); },
+      updateDeliveryNote: async (id, data) => { await updateDeliveryNoteMutation.mutateAsync({ id, data }); },
+      deleteDeliveryNote: async (id) => { await deleteDeliveryNoteMutation.mutateAsync(id); },
       refreshAll: async () => {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_orders'] }),

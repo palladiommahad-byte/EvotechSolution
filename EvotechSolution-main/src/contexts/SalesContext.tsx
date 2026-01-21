@@ -11,6 +11,7 @@ import { estimatesService, EstimateWithItems } from '@/services/estimates.servic
 import { deliveryNotesService, DeliveryNoteWithItems } from '@/services/delivery-notes.service';
 import { creditNotesService, CreditNoteWithItems } from '@/services/credit-notes.service';
 import { treasuryService } from '@/services/treasury.service';
+import { productsService } from '@/services/products.service';
 import {
   mapInvoiceStatus,
   mapInvoiceStatusToUI,
@@ -22,6 +23,8 @@ import {
   mapCreditNoteStatusToUI
 } from '@/lib/status-mapper';
 import { useToast } from '@/hooks/use-toast';
+import { UIContact } from './ContactsContext';
+import { useProducts } from './ProductsContext';
 
 // UI-friendly Sales Document interface (matches Sales page)
 export interface SalesItem {
@@ -37,16 +40,7 @@ export interface SalesDocument {
   id: string; // document_id
   documentId: string; // document_id (alias)
   client: string; // client name or ID
-  clientData?: {
-    id: string;
-    name: string;
-    company: string;
-    email: string;
-    phone: string;
-    ice: string | null;
-    if_number: string | null;
-    rc: string | null;
-  };
+  clientData?: UIContact;
   date: string;
   items: SalesItem[];
   total: number;
@@ -101,99 +95,165 @@ interface SalesContextType {
 const SalesContext = createContext<SalesContextType | undefined>(undefined);
 
 // Helper to convert invoice to SalesDocument
-const invoiceToSalesDocument = (invoice: InvoiceWithItems): SalesDocument => ({
-  id: invoice.document_id,
-  documentId: invoice.document_id,
-  client: invoice.client?.name || invoice.client_id,
-  clientData: invoice.client,
-  date: invoice.date,
-  items: invoice.items.map(item => ({
-    id: item.id,
-    productId: item.product_id || undefined,
-    description: item.description,
-    quantity: item.quantity,
-    unitPrice: item.unit_price,
-    total: item.total,
-  })),
-  total: invoice.total,
-  status: mapInvoiceStatusToUI(invoice.status),
-  type: 'invoice',
-  paymentMethod: invoice.payment_method || undefined,
-  checkNumber: (invoice as any).check_number || (invoice as any).checkNumber || undefined,
-  dueDate: invoice.due_date || undefined,
-  note: invoice.note || undefined,
-  _internalId: invoice.id,
-});
+const invoiceToSalesDocument = (invoice: InvoiceWithItems): SalesDocument => {
+  const clientData: UIContact | undefined = invoice.client ? {
+    id: invoice.client.id,
+    name: invoice.client.name,
+    company: invoice.client.company || '',
+    email: invoice.client.email || '',
+    phone: invoice.client.phone || '',
+    city: '',
+    ice: invoice.client.ice || '',
+    ifNumber: invoice.client.if_number || '',
+    rc: invoice.client.rc || '',
+    status: 'active',
+    totalTransactions: 0
+  } : undefined;
+
+  return {
+    id: invoice.document_id,
+    documentId: invoice.document_id,
+    client: invoice.client?.name || invoice.client_id,
+    clientData,
+    date: invoice.date,
+    items: invoice.items.map(item => ({
+      id: item.id,
+      productId: item.product_id || undefined,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      total: item.total,
+    })),
+    total: invoice.total,
+    status: mapInvoiceStatusToUI(invoice.status),
+    type: 'invoice',
+    paymentMethod: invoice.payment_method || undefined,
+    checkNumber: (invoice as any).check_number || (invoice as any).checkNumber || undefined,
+    dueDate: invoice.due_date || undefined,
+    note: invoice.note || undefined,
+    _internalId: invoice.id,
+  };
+};
 
 // Helper to convert estimate to SalesDocument
-const estimateToSalesDocument = (estimate: EstimateWithItems): SalesDocument => ({
-  id: estimate.document_id,
-  documentId: estimate.document_id,
-  client: estimate.client?.name || estimate.client_id,
-  clientData: estimate.client,
-  date: estimate.date,
-  items: estimate.items.map(item => ({
-    id: item.id,
-    productId: item.product_id || undefined,
-    description: item.description,
-    quantity: item.quantity,
-    unitPrice: item.unit_price,
-    total: item.total,
-  })),
-  total: estimate.total,
-  status: mapEstimateStatusToUI(estimate.status),
-  type: 'estimate',
-  note: estimate.note || undefined,
-  _internalId: estimate.id,
-});
+const estimateToSalesDocument = (estimate: EstimateWithItems): SalesDocument => {
+  const clientData: UIContact | undefined = estimate.client ? {
+    id: estimate.client.id,
+    name: estimate.client.name,
+    company: estimate.client.company || '',
+    email: estimate.client.email || '',
+    phone: estimate.client.phone || '',
+    city: '',
+    ice: estimate.client.ice || '',
+    ifNumber: estimate.client.if_number || '',
+    rc: estimate.client.rc || '',
+    status: 'active',
+    totalTransactions: 0
+  } : undefined;
+
+  return {
+    id: estimate.document_id,
+    documentId: estimate.document_id,
+    client: estimate.client?.name || estimate.client_id,
+    clientData,
+    date: estimate.date,
+    items: estimate.items.map(item => ({
+      id: item.id,
+      productId: item.product_id || undefined,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      total: item.total,
+    })),
+    total: estimate.total,
+    status: mapEstimateStatusToUI(estimate.status),
+    type: 'estimate',
+    note: estimate.note || undefined,
+    _internalId: estimate.id,
+  };
+};
 
 // Helper to convert delivery note to SalesDocument
-const deliveryNoteToSalesDocument = (deliveryNote: DeliveryNoteWithItems): SalesDocument => ({
-  id: deliveryNote.document_id,
-  documentId: deliveryNote.document_id,
-  client: deliveryNote.client?.name || deliveryNote.client_id || deliveryNote.supplier?.name || deliveryNote.supplier_id || '',
-  clientData: deliveryNote.client || deliveryNote.supplier,
-  date: deliveryNote.date,
-  items: deliveryNote.items.map(item => ({
-    id: item.id,
-    productId: item.product_id || undefined,
-    description: item.description,
-    quantity: item.quantity,
-    unitPrice: item.unit_price,
-    total: item.total,
-  })),
-  total: deliveryNote.subtotal, // Delivery notes use subtotal
-  status: mapDeliveryNoteStatusToUI(deliveryNote.status),
-  type: deliveryNote.document_type === 'divers' ? 'divers' : 'delivery_note',
-  note: deliveryNote.note || undefined,
-  _internalId: deliveryNote.id,
-});
+const deliveryNoteToSalesDocument = (deliveryNote: DeliveryNoteWithItems): SalesDocument => {
+  const contact = deliveryNote.client || deliveryNote.supplier;
+  const clientData: UIContact | undefined = contact ? {
+    id: contact.id,
+    name: contact.name,
+    company: contact.company || '',
+    email: contact.email || '',
+    phone: contact.phone || '',
+    city: '',
+    ice: contact.ice || '',
+    ifNumber: contact.if_number || '',
+    rc: contact.rc || '',
+    status: 'active',
+    totalTransactions: 0
+  } : undefined;
+
+  return {
+    id: deliveryNote.document_id,
+    documentId: deliveryNote.document_id,
+    client: deliveryNote.client?.name || deliveryNote.client_id || deliveryNote.supplier?.name || deliveryNote.supplier_id || '',
+    clientData,
+    date: deliveryNote.date,
+    items: deliveryNote.items.map(item => ({
+      id: item.id,
+      productId: item.product_id || undefined,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      total: item.total,
+    })),
+    total: deliveryNote.subtotal, // Delivery notes use subtotal
+    status: mapDeliveryNoteStatusToUI(deliveryNote.status),
+    type: deliveryNote.document_type === 'divers' ? 'divers' : 'delivery_note',
+    note: deliveryNote.note || undefined,
+    _internalId: deliveryNote.id,
+  };
+};
 
 // Helper to convert credit note to SalesDocument
-const creditNoteToSalesDocument = (creditNote: CreditNoteWithItems): SalesDocument => ({
-  id: creditNote.document_id,
-  documentId: creditNote.document_id,
-  client: creditNote.client?.name || creditNote.client_id,
-  clientData: creditNote.client,
-  date: creditNote.date,
-  items: creditNote.items.map(item => ({
-    id: item.id,
-    productId: item.product_id || undefined,
-    description: item.description,
-    quantity: item.quantity,
-    unitPrice: item.unit_price,
-    total: item.total,
-  })),
-  total: creditNote.total,
-  status: mapCreditNoteStatusToUI(creditNote.status),
-  type: 'credit_note',
-  note: creditNote.note || undefined,
-  _internalId: creditNote.id,
-});
+const creditNoteToSalesDocument = (creditNote: CreditNoteWithItems): SalesDocument => {
+  const clientData: UIContact | undefined = creditNote.client ? {
+    id: creditNote.client.id,
+    name: creditNote.client.name,
+    company: creditNote.client.company || '',
+    email: creditNote.client.email || '',
+    phone: creditNote.client.phone || '',
+    city: '',
+    ice: creditNote.client.ice || '',
+    ifNumber: creditNote.client.if_number || '',
+    rc: creditNote.client.rc || '',
+    status: 'active',
+    totalTransactions: 0
+  } : undefined;
+
+  return {
+    id: creditNote.document_id,
+    documentId: creditNote.document_id,
+    client: creditNote.client?.name || creditNote.client_id,
+    clientData,
+    date: creditNote.date,
+    items: creditNote.items.map(item => ({
+      id: item.id,
+      productId: item.product_id || undefined,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      total: item.total,
+    })),
+    total: creditNote.total,
+    status: mapCreditNoteStatusToUI(creditNote.status),
+    type: 'credit_note',
+    note: creditNote.note || undefined,
+    _internalId: creditNote.id,
+  };
+};
 
 export const SalesProvider = ({ children }: { children: ReactNode }) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { validateStockItems } = useProducts();
 
   // Fetch invoices
   const { data: invoicesData = [], isLoading: isLoadingInvoices } = useQuery({
@@ -256,9 +316,25 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
     [creditNotesData]
   );
 
+  // Helper to validate stock before document creation
+  const checkStockAvailability = async (items: SalesItem[]) => {
+    const { isValid, warnings } = validateStockItems(
+      items.map(item => ({ productId: item.productId, quantity: item.quantity }))
+    );
+
+    if (!isValid) {
+      throw new Error(
+        `Insufficient stock for the following items: ${warnings.join(', ')}. Creation blocked to prevent stock falling below minimum levels.`
+      );
+    }
+  };
+
   // Mutations for invoices
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: Omit<SalesDocument, 'id' | 'type'>) => {
+      // Validate stock levels first
+      await checkStockAvailability(data.items);
+
       // Validate and get client UUID
       const clientId = data.clientData?.id || (typeof data.client === 'string' ? data.client : null);
 
@@ -467,6 +543,9 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
   // Mutations for estimates
   const createEstimateMutation = useMutation({
     mutationFn: async (data: Omit<SalesDocument, 'id' | 'type'>) => {
+      // Validate stock levels first
+      await checkStockAvailability(data.items);
+
       // Validate and get client UUID
       const clientId = data.clientData?.id || (typeof data.client === 'string' ? data.client : null);
 
@@ -559,6 +638,9 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
   // Mutations for delivery notes
   const createDeliveryNoteMutation = useMutation({
     mutationFn: async (data: Omit<SalesDocument, 'id' | 'type'>) => {
+      // Validate stock levels first
+      await checkStockAvailability(data.items);
+
       // Validate and get client UUID
       const clientId = data.clientData?.id || (typeof data.client === 'string' ? data.client : null);
 
@@ -662,6 +744,9 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
   // Mutations for divers (same as delivery notes but with document_type='divers')
   const createDiversMutation = useMutation({
     mutationFn: async (data: Omit<SalesDocument, 'id' | 'type'>) => {
+      // Validate stock levels first
+      await checkStockAvailability(data.items);
+
       // Validate and get client UUID
       const clientId = data.clientData?.id || (typeof data.client === 'string' ? data.client : null);
 
@@ -871,21 +956,21 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
     divers,
     creditNotes,
     isLoading,
-    createInvoice: createInvoiceMutation.mutateAsync,
-    updateInvoice: (id, data) => updateInvoiceMutation.mutateAsync({ id, data }),
-    deleteInvoice: deleteInvoiceMutation.mutateAsync,
-    createEstimate: createEstimateMutation.mutateAsync,
-    updateEstimate: (id, data) => updateEstimateMutation.mutateAsync({ id, data }),
-    deleteEstimate: deleteEstimateMutation.mutateAsync,
-    createDeliveryNote: createDeliveryNoteMutation.mutateAsync,
-    updateDeliveryNote: (id, data) => updateDeliveryNoteMutation.mutateAsync({ id, data }),
-    deleteDeliveryNote: deleteDeliveryNoteMutation.mutateAsync,
-    createDivers: createDiversMutation.mutateAsync,
-    updateDivers: (id, data) => updateDiversMutation.mutateAsync({ id, data }),
-    deleteDivers: deleteDiversMutation.mutateAsync,
-    createCreditNote: createCreditNoteMutation.mutateAsync,
-    updateCreditNote: (id, data) => updateCreditNoteMutation.mutateAsync({ id, data }),
-    deleteCreditNote: deleteCreditNoteMutation.mutateAsync,
+    createInvoice: async (data) => { await createInvoiceMutation.mutateAsync(data); },
+    updateInvoice: async (id, data) => { await updateInvoiceMutation.mutateAsync({ id, data }); },
+    deleteInvoice: async (id) => { await deleteInvoiceMutation.mutateAsync(id); },
+    createEstimate: async (data) => { await createEstimateMutation.mutateAsync(data); },
+    updateEstimate: async (id, data) => { await updateEstimateMutation.mutateAsync({ id, data }); },
+    deleteEstimate: async (id) => { await deleteEstimateMutation.mutateAsync(id); },
+    createDeliveryNote: async (data) => { await createDeliveryNoteMutation.mutateAsync(data); },
+    updateDeliveryNote: async (id, data) => { await updateDeliveryNoteMutation.mutateAsync({ id, data }); },
+    deleteDeliveryNote: async (id) => { await deleteDeliveryNoteMutation.mutateAsync(id); },
+    createDivers: async (data) => { await createDiversMutation.mutateAsync(data); },
+    updateDivers: async (id, data) => { await updateDiversMutation.mutateAsync({ id, data }); },
+    deleteDivers: async (id) => { await deleteDiversMutation.mutateAsync(id); },
+    createCreditNote: async (data) => { await createCreditNoteMutation.mutateAsync(data); },
+    updateCreditNote: async (id, data) => { await updateCreditNoteMutation.mutateAsync({ id, data }); },
+    deleteCreditNote: async (id) => { await deleteCreditNoteMutation.mutateAsync(id); },
     refreshAll,
   };
 

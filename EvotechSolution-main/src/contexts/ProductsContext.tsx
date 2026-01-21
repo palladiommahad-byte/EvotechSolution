@@ -42,6 +42,7 @@ interface ProductsContextType {
   deleteProduct: (id: string) => Promise<void>;
   updateStockItem: (id: string, stockItem: Partial<StockItem>) => Promise<void>;
   refreshProducts: () => Promise<void>;
+  validateStockItems: (items: Array<{ productId?: string; quantity: number }>) => { isValid: boolean; warnings: string[] };
 }
 
 const ProductsContext = createContext<ProductsContextType | undefined>(undefined);
@@ -65,17 +66,17 @@ const toUIProduct = (product: ServiceProduct): Product => ({
 // Helper function to convert products + stock_items to UI StockItem
 const toUIStockItem = (product: ServiceProduct, stockItems: ServiceStockItem[]): StockItem => {
   const productStockItems = stockItems.filter(si => si.product_id === product.id);
-  
+
   // Aggregate stock by warehouse
   const stockByWarehouse = {
     marrakech: 0,
     agadir: 0,
     ouarzazate: 0,
   };
-  
+
   let movement: 'up' | 'down' | 'stable' = 'stable';
   let minStock = product.minStock || product.min_stock || 0;
-  
+
   productStockItems.forEach(si => {
     if (si.warehouse_id === 'marrakech') {
       stockByWarehouse.marrakech = si.quantity || 0;
@@ -84,7 +85,7 @@ const toUIStockItem = (product: ServiceProduct, stockItems: ServiceStockItem[]):
     } else if (si.warehouse_id === 'ouarzazate') {
       stockByWarehouse.ouarzazate = si.quantity || 0;
     }
-    
+
     if (si.movement) {
       movement = si.movement;
     }
@@ -92,14 +93,14 @@ const toUIStockItem = (product: ServiceProduct, stockItems: ServiceStockItem[]):
       minStock = si.min_quantity;
     }
   });
-  
+
   // If no stock_items exist, use product.stock and distribute
   if (productStockItems.length === 0) {
     const totalStock = product.stock || 0;
     stockByWarehouse.marrakech = Math.floor(totalStock * 0.4);
     stockByWarehouse.agadir = Math.floor(totalStock * 0.35);
     stockByWarehouse.ouarzazate = totalStock - stockByWarehouse.marrakech - stockByWarehouse.agadir;
-    
+
     // Determine movement based on stock level
     if (totalStock > minStock * 1.5) {
       movement = 'up';
@@ -107,7 +108,7 @@ const toUIStockItem = (product: ServiceProduct, stockItems: ServiceStockItem[]):
       movement = 'down';
     }
   }
-  
+
   return {
     id: product.id,
     name: product.name,
@@ -284,6 +285,35 @@ export const ProductsProvider = ({ children }: { children: ReactNode }) => {
     await queryClient.invalidateQueries({ queryKey: ['stockItems'] });
   }, [queryClient]);
 
+  const validateStockItems = useCallback(
+    (items: Array<{ productId?: string; quantity: number }>) => {
+      const warnings: string[] = [];
+
+      for (const item of items) {
+        if (item.productId) {
+          const product = products.find(p => p.id === item.productId);
+          if (product) {
+            const currentStock = product.stock || 0;
+            const minStock = product.minStock || 0;
+            const projectedStock = currentStock - item.quantity;
+
+            if (projectedStock <= minStock) {
+              warnings.push(
+                `${product.name} (Stock: ${currentStock}, Min: ${minStock}, Result: ${projectedStock})`
+              );
+            }
+          }
+        }
+      }
+
+      return {
+        isValid: warnings.length === 0,
+        warnings,
+      };
+    },
+    [products]
+  );
+
   return (
     <ProductsContext.Provider
       value={{
@@ -295,6 +325,7 @@ export const ProductsProvider = ({ children }: { children: ReactNode }) => {
         deleteProduct,
         updateStockItem,
         refreshProducts,
+        validateStockItems,
       }}
     >
       {children}

@@ -24,7 +24,16 @@ const data = [
   { month: 'Dec', revenue: 612000 },
 ];
 
-export const RevenueChart = () => {
+interface RevenueChartProps {
+  data?: {
+    month: string;
+    revenue: number;
+    expenses?: number;
+  }[];
+}
+
+export const RevenueChart = ({ data: externalData }: RevenueChartProps) => {
+  const displayData = externalData && externalData.length > 0 ? externalData : data;
   return (
     <div className="card-elevated p-6 animate-slide-up">
       <div className="mb-6 overflow-visible">
@@ -33,7 +42,7 @@ export const RevenueChart = () => {
       </div>
       <div className="h-[250px] min-h-[200px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data}>
+          <AreaChart data={displayData}>
             <defs>
               <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />

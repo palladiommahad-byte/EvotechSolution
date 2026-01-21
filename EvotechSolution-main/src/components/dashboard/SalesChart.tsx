@@ -47,13 +47,33 @@ const yearlyData = [
 
 type Period = 'weekly' | 'monthly' | 'yearly';
 
-export const SalesChart = () => {
+interface SalesChartProps {
+  data?: {
+    label: string;
+    value: number;
+    originalDate?: string; // To help with sorting/filtering
+  }[];
+}
+
+export const SalesChart = ({ data: externalData }: SalesChartProps) => {
   const [period, setPeriod] = useState<Period>('monthly');
 
-  const data = period === 'weekly' ? weeklyData : period === 'monthly' ? monthlyData : yearlyData;
-  const totalValue = data.reduce((sum, item) => sum + item.value, 0);
-  const avgValue = totalValue / data.length;
-  const changePercent = ((data[data.length - 1].value - data[0].value) / data[0].value * 100).toFixed(1);
+  // Use external data if available (mapped to monthly view), otherwise fallback to period selection mock data logic for now
+  // In a real scenario, we'd fetch specific data based on period.
+  // For this implementation, if externalData exists, we force "monthly" view or just show the data.
+
+  const displayData = externalData && externalData.length > 0
+    ? externalData
+    : (period === 'weekly' ? weeklyData : period === 'monthly' ? monthlyData : yearlyData);
+
+  // If we have external data, we might want to disable the period toggle or handle it differently
+  // For now, we'll just use the external data if present.
+
+  const totalValue = displayData.reduce((sum, item) => sum + item.value, 0);
+  const avgValue = totalValue / displayData.length;
+  const changePercent = displayData.length > 1
+    ? ((displayData[displayData.length - 1].value - displayData[0].value) / displayData[0].value * 100).toFixed(1)
+    : '0.0';
 
   return (
     <div className="card-elevated p-6 animate-slide-up">
@@ -66,16 +86,16 @@ export const SalesChart = () => {
           </p>
         </div>
         <div className="flex-shrink-0">
-        <ToggleButtonGroup
-          options={[
-            { value: 'weekly' as const, label: 'Weekly' },
-            { value: 'monthly' as const, label: 'Monthly' },
-            { value: 'yearly' as const, label: 'Yearly' },
-          ]}
-          value={period}
-          onChange={(val) => setPeriod(val as Period)}
-          size="sm"
-        />
+          <ToggleButtonGroup
+            options={[
+              { value: 'weekly' as const, label: 'Weekly' },
+              { value: 'monthly' as const, label: 'Monthly' },
+              { value: 'yearly' as const, label: 'Yearly' },
+            ]}
+            value={period}
+            onChange={(val) => setPeriod(val as Period)}
+            size="sm"
+          />
         </div>
       </div>
 
@@ -95,7 +115,7 @@ export const SalesChart = () => {
 
       <div className="h-[250px] min-h-[200px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data}>
+          <AreaChart data={displayData}>
             <defs>
               <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />

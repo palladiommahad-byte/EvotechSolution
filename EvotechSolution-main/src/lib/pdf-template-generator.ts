@@ -25,7 +25,7 @@ interface CompanyInfo {
 }
 
 interface DocumentData {
-  type: 'invoice' | 'estimate' | 'delivery_note' | 'purchase_order' | 'credit_note' | 'statement';
+  type: 'invoice' | 'estimate' | 'delivery_note' | 'purchase_order' | 'credit_note' | 'statement' | 'purchase_invoice' | 'purchase_delivery_note';
   documentId: string;
   date: string;
   client?: string;
@@ -79,11 +79,11 @@ export const generatePDFFromTemplate = async (data: DocumentData): Promise<void>
 
   // Get current language
   const currentLanguage = data.language || i18n.language || 'en';
-  
+
   // Try @react-pdf/renderer first, fallback to html2canvas if it fails
   try {
     console.log('Starting PDF generation with @react-pdf/renderer...');
-    
+
     // Create PDF document using React.createElement for better compatibility
     const pdfDoc = React.createElement(DocumentPDFTemplate, {
       type: data.type,
@@ -102,17 +102,17 @@ export const generatePDFFromTemplate = async (data: DocumentData): Promise<void>
     });
 
     console.log('PDF document created, generating blob...');
-    
+
     // Generate PDF blob (type assertion needed for @react-pdf/renderer compatibility)
     const blob = await pdf(pdfDoc as any).toBlob();
-    
+
     console.log('PDF blob generated, size:', blob.size);
-    
+
     // Create download link with document type name
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    
+
     // Get document type name (using translations)
     const t = (key: string) => i18n.t(key, { lng: currentLanguage });
     const getDocumentTypeName = (type: string): string => {
@@ -123,17 +123,18 @@ export const generatePDFFromTemplate = async (data: DocumentData): Promise<void>
         case 'purchase_order': return t('pdf.purchaseOrder');
         case 'credit_note': return t('pdf.creditNote');
         case 'statement': return t('pdf.statement');
+        case 'purchase_invoice': return t('pdf.purchaseInvoice');
         default: return t('pdf.document');
       }
     };
-    
+
     const documentTypeName = getDocumentTypeName(data.type);
     link.download = `${documentTypeName}_${data.documentId}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    
+
     console.log('PDF download initiated successfully');
     return;
   } catch (error) {
@@ -141,7 +142,7 @@ export const generatePDFFromTemplate = async (data: DocumentData): Promise<void>
     console.warn('Error details:', {
       message: error instanceof Error ? error.message : String(error),
     });
-    
+
     // Fallback to html2canvas method
     try {
       await generatePDFWithHtml2Canvas(data, companyInfo);
@@ -170,29 +171,31 @@ const generatePDFWithHtml2Canvas = async (data: DocumentData, companyInfo: any):
 
   // Create root and render the template wrapped in CompanyProvider
   const root = ReactDOM.createRoot(container);
-  
+
   return new Promise((resolve, reject) => {
     // Only use DocumentTemplate for supported types
-    const supportedTypes = ['invoice', 'estimate', 'delivery_note', 'purchase_order'];
+    const supportedTypes = ['invoice', 'estimate', 'delivery_note', 'purchase_order', 'purchase_invoice', 'purchase_delivery_note'];
     const useTemplate = supportedTypes.includes(data.type);
-    
+
     if (useTemplate) {
       root.render(
         React.createElement(
           CompanyProvider,
-          { children: React.createElement(DocumentTemplate, {
-            type: data.type as 'invoice' | 'estimate' | 'delivery_note' | 'purchase_order',
-            documentId: data.documentId,
-            date: data.date,
-            client: data.client,
-            supplier: data.supplier,
-            clientData: data.clientData,
-            supplierData: data.supplierData,
-            items: data.items,
-            paymentMethod: data.paymentMethod,
-            dueDate: data.dueDate,
-            note: data.note,
-          }) }
+          {
+            children: React.createElement(DocumentTemplate, {
+              type: data.type as 'invoice' | 'estimate' | 'delivery_note' | 'purchase_order' | 'purchase_invoice' | 'purchase_delivery_note',
+              documentId: data.documentId,
+              date: data.date,
+              client: data.client,
+              supplier: data.supplier,
+              clientData: data.clientData,
+              supplierData: data.supplierData,
+              items: data.items,
+              paymentMethod: data.paymentMethod,
+              dueDate: data.dueDate,
+              note: data.note,
+            })
+          }
         )
       );
     } else {
@@ -218,7 +221,7 @@ const generatePDFWithHtml2Canvas = async (data: DocumentData, companyInfo: any):
               })
           )
         );
-        
+
         await new Promise(resolve => setTimeout(resolve, 500));
         container.offsetHeight;
 
@@ -280,10 +283,12 @@ const generatePDFWithHtml2Canvas = async (data: DocumentData, companyInfo: any):
             case 'purchase_order': return t('pdf.purchaseOrder');
             case 'credit_note': return t('pdf.creditNote');
             case 'statement': return t('pdf.statement');
+            case 'purchase_invoice': return t('pdf.purchaseInvoice');
+            case 'purchase_delivery_note': return t('pdf.deliveryNote');
             default: return t('pdf.document');
           }
         };
-        
+
         const documentTypeName = getDocumentTypeName(data.type);
         pdf.save(`${documentTypeName}_${data.documentId}.pdf`);
         resolve();

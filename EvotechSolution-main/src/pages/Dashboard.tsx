@@ -15,7 +15,7 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 export const Dashboard = () => {
   const { t } = useTranslation();
   const { warehouseInfo, isAllWarehouses } = useWarehouse();
-  
+
   // Fetch real data from database
   const {
     kpis,
@@ -23,6 +23,8 @@ export const Dashboard = () => {
     earningsComparison,
     ordersComparison,
     stockValue,
+    salesChartData,
+    revenueChartData,
     isLoading,
   } = useDashboardData();
 
@@ -117,14 +119,35 @@ export const Dashboard = () => {
     };
   }, [kpis, salesComparison, earningsComparison, ordersComparison, stockValue, isLoading, t]);
 
+  // Format chart data
+  const formattedSalesData = useMemo(() => {
+    if (!salesChartData || salesChartData.length === 0) return undefined;
+
+    return salesChartData.map(item => ({
+      label: item.month, // Assumes item.month is like "Jan", "Feb" etc. from view
+      value: parseFloat(item.revenue),
+      originalDate: item.month
+    }));
+  }, [salesChartData]);
+
+  const formattedRevenueData = useMemo(() => {
+    if (!revenueChartData || revenueChartData.length === 0) return undefined;
+
+    return revenueChartData.map(item => ({
+      month: item.month,
+      revenue: parseFloat(item.revenue),
+      expenses: parseFloat(item.expenses)
+    }));
+  }, [revenueChartData]);
+
   return (
     <div className="space-y-6 pb-6">
       {/* Page Header */}
-        <div>
+      <div>
         <h1 className="text-3xl font-heading font-bold text-foreground">{t('dashboard.title')}</h1>
         <p className="text-muted-foreground mt-1">
           {t('dashboard.welcomeBack')} {isAllWarehouses ? t('dashboard.acrossAllWarehouses') : `${t('dashboard.atWarehouse')} ${warehouseInfo?.name}`}
-          </p>
+        </p>
       </div>
 
       {/* KPI Cards - Optimized grid */}
@@ -168,8 +191,8 @@ export const Dashboard = () => {
 
       {/* Charts Row - Main Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SalesChart />
-        <RevenueChart />
+        <SalesChart data={formattedSalesData} />
+        <RevenueChart data={formattedRevenueData} />
       </div>
 
       {/* Charts Row - Secondary Analytics - 2 columns per row */}

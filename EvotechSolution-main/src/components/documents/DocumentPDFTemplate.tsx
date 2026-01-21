@@ -6,7 +6,7 @@ import { InvoiceItem } from '@/lib/moroccan-utils';
 import i18n from '@/i18n/config';
 
 interface DocumentPDFTemplateProps {
-  type: 'invoice' | 'estimate' | 'delivery_note' | 'purchase_order' | 'credit_note' | 'statement';
+  type: 'invoice' | 'estimate' | 'delivery_note' | 'purchase_order' | 'credit_note' | 'statement' | 'purchase_invoice' | 'purchase_delivery_note';
   documentId: string;
   date: string;
   client?: string;
@@ -286,17 +286,19 @@ export const DocumentPDFTemplate: React.FC<DocumentPDFTemplateProps> = ({
   // Get current language or use provided language
   const currentLang = language || i18n.language || 'en';
   const t = (key: string, options?: any) => i18n.t(key, { lng: currentLang, ...options });
-  
+
   const totals = calculateInvoiceTotals(items);
   const showVAT = type === 'invoice' || type === 'estimate' || type === 'credit_note';
 
   const documentTitles: Record<string, string> = {
-    invoice: t('pdf.invoice'),
-    estimate: t('pdf.estimate'),
-    delivery_note: t('pdf.deliveryNote'),
-    purchase_order: t('pdf.purchaseOrder'),
-    credit_note: t('pdf.creditNote'),
-    statement: t('pdf.statement'),
+    invoice: String(t('pdf.invoice')),
+    estimate: String(t('pdf.estimate')),
+    delivery_note: String(t('pdf.deliveryNote')),
+    purchase_order: String(t('pdf.purchaseOrder')),
+    credit_note: String(t('pdf.creditNote')),
+    statement: String(t('pdf.statement')),
+    purchase_invoice: String(t('pdf.purchaseInvoice')),
+    purchase_delivery_note: String(t('pdf.deliveryNote')),
   };
 
   // Calculate font size based on text length - smaller for longer text
@@ -309,9 +311,9 @@ export const DocumentPDFTemplate: React.FC<DocumentPDFTemplateProps> = ({
   };
 
   const paymentMethodText: Record<string, string> = {
-    cash: t('paymentMethods.cash'),
-    check: t('paymentMethods.check'),
-    bank_transfer: t('paymentMethods.bankTransfer'),
+    cash: String(t('paymentMethods.cash')),
+    check: String(t('paymentMethods.check')),
+    bank_transfer: String(t('paymentMethods.bankTransfer')),
   };
 
   // Format date based on language
@@ -328,240 +330,305 @@ export const DocumentPDFTemplate: React.FC<DocumentPDFTemplateProps> = ({
         <View style={styles.contentWrapper}>
           {/* Header */}
           <View style={styles.header}>
-          <View style={styles.headerRow}>
-            {/* Company Info */}
-            <View style={styles.companyInfo}>
-              {companyInfo.logo && companyInfo.logo.trim() && (
-                <Image 
-                  src={companyInfo.logo} 
-                  style={styles.logo}
-                  cache={false}
-                />
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={styles.companyName}>{(companyInfo.name || 'COMPANY NAME').toUpperCase()}</Text>
-                {companyInfo.email && companyInfo.email.includes('@') && (
-                  <Text style={styles.website}>
-                    {(companyInfo.email.split('@')[1] || '').toUpperCase()}
-                  </Text>
+            <View style={styles.headerRow}>
+              {/* Company Info */}
+              <View style={styles.companyInfo}>
+                {companyInfo.logo && companyInfo.logo.trim() && (
+                  <Image
+                    src={companyInfo.logo}
+                    style={styles.logo}
+                    cache={false}
+                  />
                 )}
-              </View>
-            </View>
-
-            {/* Document Title */}
-            <View style={{ alignItems: 'flex-end', width: 'auto' }}>
-              <Text style={[styles.documentTitle, { fontSize: getTitleFontSize(documentTitles[type]) }]}>
-                {documentTitles[type]}
-              </Text>
-              <View style={[styles.invoiceDetails, { width: 'auto', alignSelf: 'flex-end' }]}>
-                <View style={styles.invoiceDetailRow}>
-                  <Text>
-                    <Text style={styles.invoiceDetailLabel}>{t('pdf.documentNumber')}: </Text>
-                    <Text style={styles.invoiceDetailValue}>{documentId}</Text>
-                  </Text>
-                </View>
-                <View>
-                  <Text>
-                    <Text style={styles.invoiceDetailLabel}>{t('common.date')}: </Text>
-                    <Text style={styles.invoiceDetailValue}>{formatDate(date)}</Text>
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Company Info and Invoice To - Side by Side */}
-          <View style={{
-            flexDirection: 'row',
-            gap: 20,
-            width: '100%',
-            marginTop: 0,
-            marginLeft: 0,
-            paddingLeft: 0,
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: 16,
-          }}>
-            {/* Company Info Box - Left (40%) */}
-            <View style={{ width: '40%', flexShrink: 0 }}>
-              <Text style={styles.invoiceToLabel}>{t('pdf.from')}:</Text>
-              <View style={styles.invoiceToBox}>
-                <Text style={styles.clientName}>
-                  {(companyInfo.name || 'COMPANY NAME').toUpperCase()}
-                </Text>
-                {companyInfo.ice && (
-                  <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
-                    {t('pdf.ice')}: {companyInfo.ice}
-                  </Text>
-                )}
-                {companyInfo.phone && (
-                  <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
-                    {t('pdf.phone')}: {companyInfo.phone}
-                  </Text>
-                )}
-                {companyInfo.address && (
-                  <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
-                    {companyInfo.address}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Invoice To Box - Right (40%) */}
-            <View style={{ width: '40%', flexShrink: 0 }}>
-              <Text style={styles.invoiceToLabel}>{type === 'purchase_order' ? t('pdf.supplier') : t('pdf.invoiceTo')}:</Text>
-              <View style={styles.invoiceToBox}>
-                {/* Use clientData/supplierData if available */}
-                {(clientData || supplierData) ? (
-                  <View>
-                    <Text style={styles.clientName}>
-                      {clientData?.company || supplierData?.company || clientData?.name || supplierData?.name || '-'}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.companyName}>{(companyInfo.name || 'COMPANY NAME').toUpperCase()}</Text>
+                  {companyInfo.email && companyInfo.email.includes('@') && (
+                    <Text style={styles.website}>
+                      {(companyInfo.email.split('@')[1] || '').toUpperCase()}
                     </Text>
-                    {clientData?.ice || supplierData?.ice ? (
-                      <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
-                        {t('pdf.ice')}: {clientData?.ice || supplierData?.ice}
-                      </Text>
-                    ) : null}
-                    {clientData?.phone || supplierData?.phone ? (
-                      <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
-                        {t('pdf.phone')}: {clientData?.phone || supplierData?.phone}
-                      </Text>
-                    ) : null}
-                    {clientData?.address || supplierData?.address ? (
-                      <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
-                        {clientData?.address || supplierData?.address}
-                      </Text>
-                    ) : null}
+                  )}
+                </View>
+              </View>
+
+              {/* Document Title */}
+              <View style={{ alignItems: 'flex-end', width: 'auto' }}>
+                <Text style={[styles.documentTitle, { fontSize: getTitleFontSize(documentTitles[type]) }]}>
+                  {documentTitles[type]}
+                </Text>
+                <View style={[styles.invoiceDetails, { width: 'auto', alignSelf: 'flex-end' }]}>
+                  <View style={styles.invoiceDetailRow}>
+                    <Text>
+                      <Text style={styles.invoiceDetailLabel}>{String(t('pdf.documentNumber'))}: </Text>
+                      <Text style={styles.invoiceDetailValue}>{documentId}</Text>
+                    </Text>
                   </View>
-                ) : (
-                  <Text style={styles.clientName}>{client || supplier || '-'}</Text>
-                )}
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Items Table - Can flow across pages */}
-        <View style={styles.table} wrap>
-          {/* Table Header */}
-          <View style={styles.tableHeader} wrap={false}>
-            <View style={[styles.tableHeaderCell, { flex: 0.6, width: '6%' }]}>
-              <Text>{t('pdf.no')}</Text>
-            </View>
-            <View style={[styles.tableHeaderCell, { flex: 4, width: '40%' }]}>
-              <Text>{t('pdf.description')}</Text>
-            </View>
-            <View style={[styles.tableHeaderCell, { flex: 1, width: '10%', textAlign: 'center' }]}>
-              <Text>{t('pdf.qty')}</Text>
-            </View>
-            <View style={[styles.tableHeaderCell, { flex: 1.6, width: '16%', textAlign: 'center' }]}>
-              <Text>{t('pdf.price')}</Text>
-            </View>
-            <View style={[styles.tableHeaderCell, { flex: 1.4, width: '14%', textAlign: 'center' }]}>
-              <Text>{t('pdf.tax')}</Text>
-            </View>
-            <View style={[styles.tableHeaderCell, { flex: 1.8, width: '18%', textAlign: 'right' }]}>
-              <Text>{t('pdf.total')}</Text>
-            </View>
-          </View>
-
-          {/* Table Rows - Can break across pages */}
-          {items.map((item, index) => {
-            const itemTax = showVAT ? item.unitPrice * VAT_RATE : 0;
-            const itemTotalAfterTax = showVAT ? (item.unitPrice + itemTax) * item.quantity : item.total;
-            
-            return (
-              <View 
-                key={item.id}
-                style={[
-                  styles.tableRow,
-                  index % 2 === 0 ? styles.rowEven : styles.rowOdd
-                ]}
-                wrap={false}
-              >
-                <View style={[styles.tableCell, { flex: 0.6, width: '6%' }]}>
-                  <Text>{index + 1}</Text>
-                </View>
-                <View style={[styles.tableCell, { flex: 4, width: '40%' }]}>
-                  <Text>{item.description || '-'}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.tableCellCenter, { flex: 1, width: '10%' }]}>
-                  <Text>{item.quantity}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.tableCellCenter, { flex: 1.6, width: '16%' }]}>
-                  <Text wrap={false} style={{ whiteSpace: 'nowrap' }}>{formatMADFull(item.unitPrice)}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.tableCellCenter, { flex: 1.4, width: '14%' }]}>
-                  <Text wrap={false} style={{ whiteSpace: 'nowrap' }}>{showVAT ? formatMADFull(itemTax) : '-'}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.tableCellRight, styles.tableCellBold, { flex: 1.8, width: '18%' }]}>
-                  <Text wrap={false} style={{ whiteSpace: 'nowrap' }}>{formatMADFull(itemTotalAfterTax)}</Text>
+                  <View>
+                    <Text>
+                      <Text style={styles.invoiceDetailLabel}>{String(t('common.date'))}: </Text>
+                      <Text style={styles.invoiceDetailValue}>{formatDate(date)}</Text>
+                    </Text>
+                  </View>
                 </View>
               </View>
-            );
-          })}
-        </View>
+            </View>
 
-        {/* Financial Summary - Keep together with table, with Note on Left */}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 20, marginBottom: 32, width: '100%' }} wrap={false}>
-          {/* Note Section - Left Side */}
-          {note && note.trim() && (
+            {/* Company Info and Invoice To - Side by Side */}
             <View style={{
-              flex: 1,
-              maxWidth: 300,
-              padding: '12px 14px',
-              backgroundColor: '#F9FAFB',
-              border: '1px solid #E5E7EB',
-              borderRadius: 6,
-              marginTop: 10,
-              marginRight: 'auto',
+              flexDirection: 'row',
+              gap: 20,
+              width: '100%',
+              marginTop: 0,
+              marginLeft: 0,
+              paddingLeft: 0,
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              marginBottom: 16,
             }}>
-              <Text style={{
-                fontSize: 9,
-                fontWeight: 700,
-                color: '#374151',
-                marginBottom: 6,
-                textTransform: 'uppercase',
-                letterSpacing: 0.05,
-              }}>
-                {t('common.notes')}
-              </Text>
-              <Text style={{
-                fontSize: 10,
-                color: '#6B7280',
-                lineHeight: 1.5,
-              }}>
-                {note}
-              </Text>
+              {/* Left Box - From (Sender) */}
+              <View style={{ width: '40%', flexShrink: 0 }}>
+                <Text style={styles.invoiceToLabel}>{String(t('pdf.from'))}:</Text>
+                <View style={styles.invoiceToBox}>
+                  {type === 'purchase_invoice' || type === 'purchase_delivery_note' ? (
+                    /* For Purchase Invoice/Delivery Note: Sender is Supplier */
+                    <View>
+                      {/* Use supplierData if available */}
+                      {(clientData || supplierData) ? (
+                        <View>
+                          <Text style={styles.clientName}>
+                            {clientData?.company || supplierData?.company || clientData?.name || supplierData?.name || '-'}
+                          </Text>
+                          {clientData?.ice || supplierData?.ice ? (
+                            <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                              {String(t('pdf.ice'))}: {clientData?.ice || supplierData?.ice}
+                            </Text>
+                          ) : null}
+                          {clientData?.phone || supplierData?.phone ? (
+                            <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                              {String(t('pdf.phone'))}: {clientData?.phone || supplierData?.phone}
+                            </Text>
+                          ) : null}
+                          {clientData?.address || supplierData?.address ? (
+                            <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                              {clientData?.address || supplierData?.address}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ) : (
+                        <Text style={styles.clientName}>{client || supplier || '-'}</Text>
+                      )}
+                    </View>
+                  ) : (
+                    /* For Sales Invoice/Others: Sender is Company (Us) */
+                    <View>
+                      <Text style={styles.clientName}>
+                        {(companyInfo.name || 'COMPANY NAME').toUpperCase()}
+                      </Text>
+                      {companyInfo.ice && (
+                        <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                          {String(t('pdf.ice'))}: {companyInfo.ice}
+                        </Text>
+                      )}
+                      {companyInfo.phone && (
+                        <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                          {String(t('pdf.phone'))}: {companyInfo.phone}
+                        </Text>
+                      )}
+                      {companyInfo.address && (
+                        <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                          {companyInfo.address}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Right Box - To (Recipient) */}
+              <View style={{ width: '40%', flexShrink: 0 }}>
+                <Text style={styles.invoiceToLabel}>
+                  {type === 'purchase_order' ? String(t('pdf.supplier')) :
+                    type === 'purchase_invoice' || type === 'purchase_delivery_note' ? String(t('pdf.invoiceTo')) :
+                      String(t('pdf.invoiceTo'))}:
+                </Text>
+                <View style={styles.invoiceToBox}>
+                  {type === 'purchase_invoice' || type === 'purchase_delivery_note' ? (
+                    /* For Purchase Invoice/Delivery Note: Recipient is Company (Us) */
+                    <View>
+                      <Text style={styles.clientName}>
+                        {(companyInfo.name || 'COMPANY NAME').toUpperCase()}
+                      </Text>
+                      {companyInfo.ice && (
+                        <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                          {String(t('pdf.ice'))}: {companyInfo.ice}
+                        </Text>
+                      )}
+                      {companyInfo.phone && (
+                        <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                          {String(t('pdf.phone'))}: {companyInfo.phone}
+                        </Text>
+                      )}
+                      {companyInfo.address && (
+                        <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                          {companyInfo.address}
+                        </Text>
+                      )}
+                    </View>
+                  ) : (
+                    /* For Sales Invoice/Others: Recipient is Client/Supplier */
+                    <View>
+                      {/* Use clientData/supplierData if available */}
+                      {(clientData || supplierData) ? (
+                        <View>
+                          <Text style={styles.clientName}>
+                            {clientData?.company || supplierData?.company || clientData?.name || supplierData?.name || '-'}
+                          </Text>
+                          {clientData?.ice || supplierData?.ice ? (
+                            <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                              {String(t('pdf.ice'))}: {clientData?.ice || supplierData?.ice}
+                            </Text>
+                          ) : null}
+                          {clientData?.phone || supplierData?.phone ? (
+                            <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                              {String(t('pdf.phone'))}: {clientData?.phone || supplierData?.phone}
+                            </Text>
+                          ) : null}
+                          {clientData?.address || supplierData?.address ? (
+                            <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>
+                              {clientData?.address || supplierData?.address}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ) : (
+                        <Text style={styles.clientName}>{client || supplier || '-'}</Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              </View>
             </View>
-          )}
-          
-          {/* Summary Box - Right Side - Always Right Aligned */}
-          <View style={styles.summaryBox} wrap={false}>
-          {showVAT && (
-            <>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryText}>{t('documents.subtotalHT')}</Text>
-                <Text style={styles.summaryTextBold} wrap={false}>{formatMADFull(totals.subtotal)}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryText}>{t('documents.vat')} {VAT_RATE * 100}%</Text>
-                <Text style={styles.summaryTextBold} wrap={false}>{formatMADFull(totals.vat)}</Text>
-              </View>
-              <View style={styles.summaryTotal}>
-                <Text style={styles.summaryTotalText}>{t('pdf.grandTotal')}</Text>
-                <Text style={styles.summaryTotalText} wrap={false}>{formatMADFull(totals.total)}</Text>
-              </View>
-            </>
-          )}
-          {!showVAT && (
-            <View style={styles.summaryTotal}>
-              <Text style={styles.summaryTotalText}>{t('pdf.grandTotal')}</Text>
-              <Text style={styles.summaryTotalText} wrap={false}>{formatMADFull(totals.subtotal)}</Text>
-            </View>
-          )}
           </View>
-        </View>
+
+          {/* Items Table - Can flow across pages */}
+          <View style={styles.table} wrap>
+            {/* Table Header */}
+            <View style={styles.tableHeader} wrap={false}>
+              <View style={[styles.tableHeaderCell, { flex: 0.6, width: '6%' }]}>
+                <Text>{String(t('pdf.no'))}</Text>
+              </View>
+              <View style={[styles.tableHeaderCell, { flex: 4, width: '40%' }]}>
+                <Text>{String(t('pdf.description'))}</Text>
+              </View>
+              <View style={[styles.tableHeaderCell, { flex: 1, width: '10%', textAlign: 'center' }]}>
+                <Text>{String(t('pdf.qty'))}</Text>
+              </View>
+              <View style={[styles.tableHeaderCell, { flex: 1.6, width: '16%', textAlign: 'center' }]}>
+                <Text>{String(t('pdf.price'))}</Text>
+              </View>
+              <View style={[styles.tableHeaderCell, { flex: 1.4, width: '14%', textAlign: 'center' }]}>
+                <Text>{String(t('pdf.tax'))}</Text>
+              </View>
+              <View style={[styles.tableHeaderCell, { flex: 1.8, width: '18%', textAlign: 'right' }]}>
+                <Text>{String(t('pdf.total'))}</Text>
+              </View>
+            </View>
+
+            {/* Table Rows - Can break across pages */}
+            {items.map((item, index) => {
+              const itemTax = showVAT ? item.unitPrice * VAT_RATE : 0;
+              const itemTotalAfterTax = showVAT ? (item.unitPrice + itemTax) * item.quantity : item.total;
+
+              return (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.tableRow,
+                    index % 2 === 0 ? styles.rowEven : styles.rowOdd
+                  ]}
+                  wrap={false}
+                >
+                  <View style={[styles.tableCell, { flex: 0.6, width: '6%' }]}>
+                    <Text>{index + 1}</Text>
+                  </View>
+                  <View style={[styles.tableCell, { flex: 4, width: '40%' }]}>
+                    <Text>{item.description || '-'}</Text>
+                  </View>
+                  <View style={[styles.tableCell, styles.tableCellCenter, { flex: 1, width: '10%' }]}>
+                    <Text>{item.quantity}</Text>
+                  </View>
+                  <View style={[styles.tableCell, styles.tableCellCenter, { flex: 1.6, width: '16%' }]}>
+                    <Text wrap={false}>{formatMADFull(item.unitPrice)}</Text>
+                  </View>
+                  <View style={[styles.tableCell, styles.tableCellCenter, { flex: 1.4, width: '14%' }]}>
+                    <Text wrap={false}>{showVAT ? formatMADFull(itemTax) : '-'}</Text>
+                  </View>
+                  <View style={[styles.tableCell, styles.tableCellRight, styles.tableCellBold, { flex: 1.8, width: '18%' }]}>
+                    <Text wrap={false}>{formatMADFull(itemTotalAfterTax)}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Financial Summary - Keep together with table, with Note on Left */}
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 20, marginBottom: 32, width: '100%' }} wrap={false}>
+            {/* Note Section - Left Side */}
+            {note && note.trim() && (
+              <View style={{
+                flex: 1,
+                maxWidth: 300,
+                padding: '12px 14px',
+                backgroundColor: '#F9FAFB',
+                border: '1px solid #E5E7EB',
+                borderRadius: 6,
+                marginTop: 10,
+                marginRight: 'auto',
+              }}>
+                <Text style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: '#374151',
+                  marginBottom: 6,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.05,
+                }}>
+                  {String(t('common.notes'))}
+                </Text>
+                <Text style={{
+                  fontSize: 10,
+                  color: '#6B7280',
+                  lineHeight: 1.5,
+                }}>
+                  {note}
+                </Text>
+              </View>
+            )}
+
+            {/* Summary Box - Right Side - Always Right Aligned */}
+            <View style={styles.summaryBox} wrap={false}>
+              {showVAT && (
+                <>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryText}>{String(t('documents.subtotalHT'))}</Text>
+                    <Text style={styles.summaryTextBold} wrap={false}>{formatMADFull(totals.subtotal)}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryText}>{String(t('documents.vat'))} {VAT_RATE * 100}%</Text>
+                    <Text style={styles.summaryTextBold} wrap={false}>{formatMADFull(totals.vat)}</Text>
+                  </View>
+                  <View style={styles.summaryTotal}>
+                    <Text style={styles.summaryTotalText}>{String(t('pdf.grandTotal'))}</Text>
+                    <Text style={styles.summaryTotalText} wrap={false}>{formatMADFull(totals.total)}</Text>
+                  </View>
+                </>
+              )}
+              {!showVAT && (
+                <View style={styles.summaryTotal}>
+                  <Text style={styles.summaryTotalText}>{String(t('pdf.grandTotal'))}</Text>
+                  <Text style={styles.summaryTotalText} wrap={false}>{formatMADFull(totals.subtotal)}</Text>
+                </View>
+              )}
+            </View>
+          </View>
 
           {/* Footer - Company Details - Single line - Always at bottom */}
           <View style={styles.footer}>
@@ -573,12 +640,12 @@ export const DocumentPDFTemplate: React.FC<DocumentPDFTemplateProps> = ({
               fontWeight: 700,
             }}>
               {[
-                companyInfo.ice && `${t('pdf.ice')}: ${companyInfo.ice}`,
-                companyInfo.ifNumber && `${t('pdf.if')}: ${companyInfo.ifNumber}`,
-                companyInfo.rc && `${t('pdf.rc')}: ${companyInfo.rc}`,
-                companyInfo.cnss && `${t('pdf.cnss')}: ${companyInfo.cnss}`,
-                companyInfo.phone && `${t('pdf.phone')}: ${companyInfo.phone}`,
-                companyInfo.email && `${t('common.email')}: ${companyInfo.email}`
+                companyInfo.ice && `${String(t('pdf.ice'))}: ${companyInfo.ice}`,
+                companyInfo.ifNumber && `${String(t('pdf.if'))}: ${companyInfo.ifNumber}`,
+                companyInfo.rc && `${String(t('pdf.rc'))}: ${companyInfo.rc}`,
+                companyInfo.cnss && `${String(t('pdf.cnss'))}: ${companyInfo.cnss}`,
+                companyInfo.phone && `${String(t('pdf.phone'))}: ${companyInfo.phone}`,
+                companyInfo.email && `${String(t('common.email'))}: ${companyInfo.email}`
               ].filter(Boolean).join(' | ')}
             </Text>
           </View>

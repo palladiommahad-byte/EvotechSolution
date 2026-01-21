@@ -11,19 +11,28 @@ DECLARE
     v_difference DECIMAL;
     v_document_id VARCHAR;
     v_warehouse_id VARCHAR;
-    v_old_warehouse_id VARCHAR;
+    v_client_id UUID;
+    v_supplier_id UUID;
+    v_is_sale BOOLEAN;
 BEGIN
     -- Handle INSERT
     IF (TG_OP = 'INSERT') THEN
         v_product_id := NEW.product_id;
         v_quantity := NEW.quantity;
         
-        -- Get Document ID and Warehouse
-        SELECT document_id, warehouse_id INTO v_document_id, v_warehouse_id FROM delivery_notes WHERE id = NEW.delivery_note_id;
+        -- Get Document ID, Warehouse, Client and Supplier
+        SELECT document_id, warehouse_id, client_id, supplier_id 
+        INTO v_document_id, v_warehouse_id, v_client_id, v_supplier_id 
+        FROM delivery_notes WHERE id = NEW.delivery_note_id;
         
-        -- If no warehouse specified, default to 'marrakech' (or handle as error if strict)
-        IF v_warehouse_id IS NULL THEN
-            v_warehouse_id := 'marrakech';
+        IF v_warehouse_id IS NULL THEN v_warehouse_id := 'marrakech'; END IF;
+        
+        -- Determine if it's a sale or purchase
+        v_is_sale := v_client_id IS NOT NULL;
+        
+        -- If it's a sale, we reduce stock. If it's a purchase, we increment it.
+        IF NOT v_is_sale THEN
+            v_quantity := -v_quantity; -- Invert quantity for purchase (incrementing stock)
         END IF;
 
         -- Update global product stock
@@ -39,24 +48,11 @@ BEGIN
             END
         WHERE id = v_product_id;
 
-        -- Update Warehouse Specific Stock (UPSERT)
-        INSERT INTO stock_items (id, product_id, warehouse_id, quantity, last_updated)
-        VALUES (uuid_generate_v4(), v_product_id, v_warehouse_id, -v_quantity, NOW()) -- Initial negative? No, this table has absolute values.
-        -- Wait, stock_items has absolute quantity. We need to decrement it.
-        -- But if it doesn't exist, we assume 0 and decrement? That would be negative stock.
-        ON CONFLICT (product_id, warehouse_id) 
-        DO UPDATE SET 
-            quantity = stock_items.quantity - EXCLUDED.quantity, -- EXCLUDED.quantity is -v_quantity? No.
-            -- Let's rethink the UPSERT for decrement.
-            -- We want: new_quantity = old_quantity - v_quantity.
-            last_updated = NOW();
-            
-        -- Correct logic for warehouse stock update:
+        -- Update Warehouse Specific Stock
         UPDATE stock_items 
         SET quantity = quantity - v_quantity, last_updated = NOW()
         WHERE product_id = v_product_id AND warehouse_id = v_warehouse_id;
         
-        -- If no row was updated (item didn't exist in that warehouse), insert it with negative quantity (or 0 - quantity)
         IF NOT FOUND THEN
              INSERT INTO stock_items (product_id, warehouse_id, quantity, last_updated)
              VALUES (v_product_id, v_warehouse_id, -v_quantity, NOW());
@@ -64,7 +60,8 @@ BEGIN
         
         -- Log Movement
         INSERT INTO stock_movements (product_id, quantity, type, reference_id, description)
-        VALUES (v_product_id, -v_quantity, 'delivery_note', v_document_id, 'Delivery Note Created (Warehouse: ' || v_warehouse_id || ')');
+        VALUES (v_product_id, -v_quantity, 'delivery_note', v_document_id, 
+                CASE WHEN v_is_sale THEN 'Sale' ELSE 'Purchase' END || ' Delivery Note Created (Warehouse: ' || v_warehouse_id || ')');
         
     -- Handle DELETE
     ELSIF (TG_OP = 'DELETE') THEN
@@ -72,13 +69,20 @@ BEGIN
         v_quantity := OLD.quantity;
         
         BEGIN
-            SELECT document_id, warehouse_id INTO v_document_id, v_warehouse_id FROM delivery_notes WHERE id = OLD.delivery_note_id;
+            SELECT document_id, warehouse_id, client_id, supplier_id 
+            INTO v_document_id, v_warehouse_id, v_client_id, v_supplier_id 
+            FROM delivery_notes WHERE id = OLD.delivery_note_id;
         EXCEPTION WHEN OTHERS THEN
             v_document_id := 'DELETED';
-            v_warehouse_id := 'marrakech'; -- Fallback
+            v_warehouse_id := 'marrakech';
         END;
 
         IF v_warehouse_id IS NULL THEN v_warehouse_id := 'marrakech'; END IF;
+        v_is_sale := v_client_id IS NOT NULL;
+        
+        IF NOT v_is_sale THEN
+            v_quantity := -v_quantity;
+        END IF;
 
         -- Restore global product stock
         UPDATE products
@@ -98,7 +102,6 @@ BEGIN
         SET quantity = quantity + v_quantity, last_updated = NOW()
         WHERE product_id = v_product_id AND warehouse_id = v_warehouse_id;
         
-        -- If not found, insert (technically shouldn't happen if we are restoring, but good for safety)
         IF NOT FOUND THEN
              INSERT INTO stock_items (product_id, warehouse_id, quantity, last_updated)
              VALUES (v_product_id, v_warehouse_id, v_quantity, NOW());
@@ -106,48 +109,58 @@ BEGIN
 
         -- Log Movement
         INSERT INTO stock_movements (product_id, quantity, type, reference_id, description)
-        VALUES (v_product_id, v_quantity, 'delivery_note_cancel', v_document_id, 'Delivery Note Deleted (Warehouse: ' || v_warehouse_id || ')');
+        VALUES (v_product_id, v_quantity, 'delivery_note_cancel', v_document_id, 
+                CASE WHEN v_is_sale THEN 'Sale' ELSE 'Purchase' END || ' Delivery Note Deleted (Warehouse: ' || v_warehouse_id || ')');
         
     -- Handle UPDATE
     ELSIF (TG_OP = 'UPDATE') THEN
-        -- We need to check if quantity changed OR if the parent delivery note's *warehouse* changed.
-        -- But this trigger is on `delivery_note_items`. It doesn't fire when `delivery_notes` changes.
-        -- Limitation: Changing the warehouse of a Delivery Note won't trigger this unless we also update items or have a trigger on delivery_notes itself.
-        -- For now, let's assume we are handling Item updates only. User should assume if they change warehouse, they might need to re-save items? 
-        -- Ideally, we'd have a separate trigger on delivery_notes for warehouse change. 
-        -- Let's stick to item changes for now.
-        
         IF (OLD.quantity != NEW.quantity) OR (OLD.product_id != NEW.product_id) THEN
             
-             -- Get Document ID
-            SELECT document_id, warehouse_id INTO v_document_id, v_warehouse_id FROM delivery_notes WHERE id = NEW.delivery_note_id;
+            SELECT document_id, warehouse_id, client_id, supplier_id 
+            INTO v_document_id, v_warehouse_id, v_client_id, v_supplier_id 
+            FROM delivery_notes WHERE id = NEW.delivery_note_id;
             
             IF v_warehouse_id IS NULL THEN v_warehouse_id := 'marrakech'; END IF;
+            v_is_sale := v_client_id IS NOT NULL;
 
             -- If product ID changed
             IF (OLD.product_id != NEW.product_id) THEN
-                -- Restore old global
-                UPDATE products SET stock = stock + OLD.quantity WHERE id = OLD.product_id;
-                -- Restore old warehouse
-                UPDATE stock_items SET quantity = quantity + OLD.quantity WHERE product_id = OLD.product_id AND warehouse_id = v_warehouse_id;
-                
-                INSERT INTO stock_movements (product_id, quantity, type, reference_id, description)
-                VALUES (OLD.product_id, OLD.quantity, 'delivery_note_update', v_document_id, 'Item Removed from DN');
+                -- Restore old
+                BEGIN
+                    DECLARE
+                        v_old_qty DECIMAL := OLD.quantity;
+                    BEGIN
+                        IF NOT v_is_sale THEN v_old_qty := -v_old_qty; END IF;
+                        
+                        UPDATE products SET stock = stock + v_old_qty WHERE id = OLD.product_id;
+                        UPDATE stock_items SET quantity = quantity + v_old_qty WHERE product_id = OLD.product_id AND warehouse_id = v_warehouse_id;
+                        
+                        INSERT INTO stock_movements (product_id, quantity, type, reference_id, description)
+                        VALUES (OLD.product_id, v_old_qty, 'delivery_note_update', v_document_id, 'Item Removed from DN');
+                    END;
+                END;
 
-                -- Consume new global
-                UPDATE products SET stock = stock - NEW.quantity WHERE id = NEW.product_id;
-                -- Consume new warehouse
-                 UPDATE stock_items SET quantity = quantity - NEW.quantity WHERE product_id = NEW.product_id AND warehouse_id = v_warehouse_id;
-                 IF NOT FOUND THEN
-                    INSERT INTO stock_items (product_id, warehouse_id, quantity, last_updated) VALUES (NEW.product_id, v_warehouse_id, -NEW.quantity, NOW());
-                 END IF;
-                 
-                INSERT INTO stock_movements (product_id, quantity, type, reference_id, description)
-                VALUES (NEW.product_id, -NEW.quantity, 'delivery_note_update', v_document_id, 'Item Added to DN');
-
+                -- Consume new
+                BEGIN
+                    DECLARE
+                        v_new_qty DECIMAL := NEW.quantity;
+                    BEGIN
+                        IF NOT v_is_sale THEN v_new_qty := -v_new_qty; END IF;
+                        
+                        UPDATE products SET stock = stock - v_new_qty WHERE id = NEW.product_id;
+                        UPDATE stock_items SET quantity = quantity - v_new_qty WHERE product_id = NEW.product_id AND warehouse_id = v_warehouse_id;
+                        IF NOT FOUND THEN
+                            INSERT INTO stock_items (product_id, warehouse_id, quantity, last_updated) VALUES (NEW.product_id, v_warehouse_id, -v_new_qty, NOW());
+                        END IF;
+                        
+                        INSERT INTO stock_movements (product_id, quantity, type, reference_id, description)
+                        VALUES (NEW.product_id, -v_new_qty, 'delivery_note_update', v_document_id, 'Item Added to DN');
+                    END;
+                END;
             ELSE
                 -- Same product, adjust difference
                 v_difference := NEW.quantity - OLD.quantity;
+                IF NOT v_is_sale THEN v_difference := -v_difference; END IF;
                 
                 -- Adjust global
                 UPDATE products
