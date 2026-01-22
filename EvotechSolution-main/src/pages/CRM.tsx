@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Search, Building2, User, Phone, Mail, MapPin, FileText, Eye, Edit, Trash2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -178,12 +178,12 @@ const ContactForm = ({ type, contact, onSubmit, onCancel }: ContactFormProps) =>
 };
 
 interface ContactTableProps {
-      contacts: Contact[];
-      type: 'client' | 'supplier';
-      onView: (contact: Contact) => void;
-      onEdit: (contact: Contact) => void;
-      onDelete: (contact: Contact) => void;
-    }
+  contacts: Contact[];
+  type: 'client' | 'supplier';
+  onView: (contact: Contact) => void;
+  onEdit: (contact: Contact) => void;
+  onDelete: (contact: Contact) => void;
+}
 
 const ContactTable = ({ contacts, type, onView, onEdit, onDelete }: ContactTableProps) => {
   const { t } = useTranslation();
@@ -293,7 +293,7 @@ export const CRM = () => {
     updateSupplier,
     deleteSupplier,
   } = useContacts();
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingContact, setViewingContact] = useState<Contact | null>(null);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -323,9 +323,20 @@ export const CRM = () => {
 
   const confirmDeleteContact = async () => {
     if (deletingContact) {
+      // Prevent deletion if contact has transactions
+      if (deletingContact.totalTransactions > 0) {
+        toast({
+          title: t('common.error', { defaultValue: 'Error' }),
+          description: t('crm.cannotDeleteWithTransactions', { defaultValue: "Cannot delete contact with existing transactions." }),
+          variant: "destructive",
+        });
+        setDeletingContact(null);
+        return;
+      }
+
       const contactName = deletingContact.company || deletingContact.name;
       const contactType = activeTab === 'clients' ? t('crm.client') : t('crm.supplier');
-      
+
       try {
         if (activeTab === 'clients') {
           await deleteClient(deletingContact.id);
@@ -338,10 +349,35 @@ export const CRM = () => {
           description: t('crm.contactDeletedDescription', { contactType, contactName }),
           variant: "destructive",
         });
-      } catch (error) {
+      } catch (error: any) {
+        console.error('Delete operation failed:', error);
+
+        // If hard delete fails (likely due to foreign key constraints), try soft delete (archive)
+        if (error?.code === '23503' || error?.status === 409 || error?.message?.includes('violates foreign key constraint')) {
+          try {
+            if (activeTab === 'clients') {
+              await updateClient(deletingContact.id, { status: 'inactive' });
+            } else {
+              await updateSupplier(deletingContact.id, { status: 'inactive' });
+            }
+
+            setDeletingContact(null);
+            toast({
+              title: t('crm.contactArchived', { defaultValue: 'Contact Archived' }),
+              description: t('crm.contactArchivedDescription', {
+                defaultValue: "Contact could not be deleted permanently due to existing records, so it was marked as inactive instead.",
+                contactName
+              }),
+            });
+            return;
+          } catch (archiveError) {
+            console.error('Archive operation failed:', archiveError);
+          }
+        }
+
         toast({
           title: t('common.error', { defaultValue: 'Error' }),
-          description: t('crm.failedToDelete', { contactType: contactType.toLowerCase() }),
+          description: error instanceof Error ? error.message : t('crm.failedToDelete', { contactType: contactType.toLowerCase() }),
           variant: "destructive",
         });
       }
@@ -351,7 +387,7 @@ export const CRM = () => {
   const handleCreate = async (contactData: Partial<Contact>) => {
     const contactType = activeTab === 'clients' ? t('crm.client') : t('crm.supplier');
     const contactName = contactData.company || contactData.name || '';
-    
+
     try {
       if (activeTab === 'clients') {
         await addClient(contactData as Omit<Contact, 'id' | 'totalTransactions'>);
@@ -376,7 +412,7 @@ export const CRM = () => {
     if (editingContact) {
       const contactType = activeTab === 'clients' ? t('crm.client') : t('crm.supplier');
       const contactName = contactData.company || contactData.name || editingContact.company || editingContact.name || '';
-      
+
       try {
         if (activeTab === 'clients') {
           await updateClient(editingContact.id, contactData);
@@ -412,16 +448,16 @@ export const CRM = () => {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'clients' | 'suppliers')} className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <TabsList className="bg-section">
-            <TabsTrigger value="clients" className="gap-2">
+            <TabsTrigger value="clients" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
               <User className="w-4 h-4" />
               {t('crm.clients')}
             </TabsTrigger>
-            <TabsTrigger value="suppliers" className="gap-2">
+            <TabsTrigger value="suppliers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all">
               <Building2 className="w-4 h-4" />
               {t('crm.suppliers')}
             </TabsTrigger>
           </TabsList>
-          
+
           <div className="flex gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -447,7 +483,7 @@ export const CRM = () => {
                   </DialogDescription>
                 </DialogHeader>
                 <ContactForm
-                  type={activeTab}
+                  type={activeTab === 'clients' ? 'client' : 'supplier'}
                   onSubmit={handleCreate}
                   onCancel={() => setIsCreateDialogOpen(false)}
                 />
@@ -584,7 +620,7 @@ export const CRM = () => {
           </DialogHeader>
           {editingContact && (
             <ContactForm
-              type={activeTab}
+              type={activeTab === 'clients' ? 'client' : 'supplier'}
               contact={editingContact}
               onSubmit={handleUpdate}
               onCancel={() => setEditingContact(null)}
@@ -599,7 +635,7 @@ export const CRM = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('crm.deleteContact', { type: activeTab === 'clients' ? t('crm.client') : t('crm.supplier') })}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('crm.deleteConfirmation', { name: deletingContact?.company || deletingContact?.name })}
+              <Trans i18nKey="crm.deleteConfirmation" values={{ name: deletingContact?.company || deletingContact?.name }} components={{ strong: <strong /> }} />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

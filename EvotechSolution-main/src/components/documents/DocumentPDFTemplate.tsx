@@ -324,6 +324,43 @@ export const DocumentPDFTemplate: React.FC<DocumentPDFTemplateProps> = ({
     return d.toLocaleDateString(locale, options);
   };
 
+  // Format document ID with French prefix based on document type
+  const formatDocumentId = (id: string, docType: string): string => {
+    // Define French prefixes for each document type
+    const prefixes: Record<string, string> = {
+      invoice: 'FC',                    // Facture
+      estimate: 'DV',                   // Devis
+      delivery_note: 'BL',              // Bon de Livraison
+      purchase_order: 'BC',             // Bon de Commande
+      credit_note: 'AV',                // Avoir
+      statement: 'RL',                  // Relevé
+      purchase_invoice: 'FA',           // Facture d'Achat
+      purchase_delivery_note: 'BL',     // Bon de Livraison
+    };
+
+    const prefix = prefixes[docType] || 'DOC';
+
+    // Replace English database prefixes with French ones
+    if (id.startsWith('INV-')) return id.replace('INV-', 'FC-');
+    if (id.startsWith('EST-')) return id.replace('EST-', 'DV-');
+    if (id.startsWith('DN-')) return id.replace('DN-', 'BL-');
+    if (id.startsWith('DIV-')) return id.replace('DIV-', 'BL-');
+    if (id.startsWith('CN-')) return id.replace('CN-', 'AV-');
+    if (id.startsWith('ST-')) return id.replace('ST-', 'RL-');
+    if (id.startsWith('PO-')) return id.replace('PO-', 'BC-');
+    if (id.startsWith('PI-')) return id.replace('PI-', 'FA-');
+
+    // If ID already has a prefix, return as is
+    if (id.match(/^[A-Z]{2,4}-/)) {
+      return id;
+    }
+
+    // Otherwise, add the prefix
+    return `${prefix}-${id}`;
+  };
+
+  const formattedDocumentId = formatDocumentId(documentId, type);
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -359,7 +396,7 @@ export const DocumentPDFTemplate: React.FC<DocumentPDFTemplateProps> = ({
                   <View style={styles.invoiceDetailRow}>
                     <Text>
                       <Text style={styles.invoiceDetailLabel}>{String(t('pdf.documentNumber'))}: </Text>
-                      <Text style={styles.invoiceDetailValue}>{documentId}</Text>
+                      <Text style={styles.invoiceDetailValue}>{formattedDocumentId}</Text>
                     </Text>
                   </View>
                   <View>

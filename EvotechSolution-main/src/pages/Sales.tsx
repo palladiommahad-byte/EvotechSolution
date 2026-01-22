@@ -278,6 +278,46 @@ export const Sales = () => {
     }
   };
 
+  // Format document ID with French prefix based on document type
+  const formatDocumentId = (id: string, docType: string): string => {
+    const prefixes: Record<string, string> = {
+      invoice: 'FC',
+      estimate: 'DV',
+      delivery_note: 'BL',
+      divers: 'BL',
+      credit_note: 'AV',
+      statement: 'RL',
+    };
+
+    // Replace English database prefixes with French ones
+    if (id.startsWith('INV-')) return id.replace('INV-', 'FC-');
+    if (id.startsWith('EST-')) return id.replace('EST-', 'DV-');
+    if (id.startsWith('DN-')) return id.replace('DN-', 'BL-');
+    if (id.startsWith('DIV-')) return id.replace('DIV-', 'BL-');
+    if (id.startsWith('CN-')) return id.replace('CN-', 'AV-');
+    if (id.startsWith('ST-')) return id.replace('ST-', 'RL-');
+
+    const prefix = prefixes[docType] || 'DOC';
+
+    // If ID already has a prefix, return as is
+    if (id.match(/^[A-Z]{2,4}-/)) {
+      return id;
+    }
+
+    // Otherwise, add the prefix
+    return `${prefix}-${id}`;
+  };
+
+  // Get client display name from document
+  const getClientDisplayName = (doc: SalesDocument): string => {
+    if (doc.clientData) {
+      return doc.clientData.company || doc.clientData.name || doc.client || 'Unknown Client';
+    }
+    // Fallback: try to look up from contacts
+    const client = clients.find(c => c.id === doc.client);
+    return client ? (client.company || client.name) : doc.client || 'Unknown Client';
+  };
+
   const handleViewDocument = (doc: SalesDocument) => {
     setViewingDocument(doc);
   };
@@ -339,17 +379,21 @@ export const Sales = () => {
     try {
       const docType = doc.type || activeTab;
 
-      // If clientData is missing, try to find it from CRM using client name
+      // If clientData is missing, try to find it from CRM using client ID
       let docWithClientData = { ...doc };
       if (!docWithClientData.clientData && docWithClientData.client) {
-        // Try to find client by matching company or name
-        const foundClient = clients.find(c =>
-          c.company === docWithClientData.client ||
-          c.name === docWithClientData.client
-        );
+        console.log('Looking up client:', docWithClientData.client);
+        console.log('Available clients:', clients.length);
+        // Try to find client by ID (client field stores the UUID)
+        const foundClient = clients.find(c => c.id === docWithClientData.client);
         if (foundClient) {
+          console.log('Found client:', foundClient.company || foundClient.name);
           docWithClientData.clientData = foundClient;
+        } else {
+          console.warn('Client not found in CRM. Client ID:', docWithClientData.client);
         }
+      } else if (docWithClientData.clientData) {
+        console.log('Client data already present:', docWithClientData.clientData.company || docWithClientData.clientData.name);
       }
 
       // Prepare document data with items if available
@@ -357,6 +401,12 @@ export const Sales = () => {
         ...docWithClientData,
         items: docWithClientData.items || (typeof docWithClientData.items === 'number' ? docWithClientData.items : 0),
       };
+
+      console.log('Passing to PDF generator:', {
+        hasClientData: !!docWithItems.clientData,
+        clientDataName: docWithItems.clientData?.company || docWithItems.clientData?.name,
+        clientField: docWithItems.client
+      });
 
       switch (docType) {
         case 'invoice':
@@ -388,13 +438,11 @@ export const Sales = () => {
     try {
       const docType = doc.type || activeTab;
 
-      // If clientData is missing, try to find it from CRM using client name
+      // If clientData is missing, try to find it from CRM using client ID
       let docWithClientData = { ...doc };
       if (!docWithClientData.clientData && docWithClientData.client) {
-        const foundClient = clients.find(c =>
-          c.company === docWithClientData.client ||
-          c.name === docWithClientData.client
-        );
+        // Try to find client by ID (client field stores the UUID)
+        const foundClient = clients.find(c => c.id === docWithClientData.client);
         if (foundClient) {
           docWithClientData.clientData = foundClient;
         }
@@ -1005,12 +1053,7 @@ export const Sales = () => {
           <h1 className="text-2xl font-heading font-bold text-foreground">{t('sales.title')}</h1>
           <p className="text-muted-foreground">{t('sales.description')}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <Download className="w-4 h-4" />
-            {t('common.export')}
-          </Button>
-        </div>
+
       </div>
 
       {/* KPIs */}
@@ -1871,8 +1914,8 @@ export const Sales = () => {
                                 />
                               </div>
                             </TableCell>
-                            <TableCell className="font-mono font-medium max-w-[120px] truncate">{doc.id}</TableCell>
-                            <TableCell className="max-w-[200px] truncate">{doc.client}</TableCell>
+                            <TableCell className="font-mono font-medium max-w-[120px] truncate">{formatDocumentId(doc.id, doc.type)}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{getClientDisplayName(doc)}</TableCell>
                             <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
                             <TableCell className="text-right number-cell">
                               {Array.isArray(doc.items) ? doc.items.length : doc.items}
@@ -3642,13 +3685,13 @@ export const Sales = () => {
             <>
               <DialogHeader>
                 <DialogTitle>{getDocumentTitle()} Details</DialogTitle>
-                <DialogDescription>Document #{viewingDocument.id}</DialogDescription>
+                <DialogDescription>Document #{formatDocumentId(viewingDocument.id, viewingDocument.type)}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-muted-foreground">Client</Label>
-                    <p className="font-medium">{viewingDocument.client}</p>
+                    <p className="font-medium">{getClientDisplayName(viewingDocument)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Date</Label>

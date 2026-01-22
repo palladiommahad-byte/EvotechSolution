@@ -36,7 +36,6 @@ const getNavigationItems = (t: (key: string) => string) => [
 
 const getSecondaryNavItems = (t: (key: string) => string) => [
   { name: t('nav.crm'), href: '/crm', icon: Users, roles: ['admin', 'manager'] },
-  { name: t('nav.invoicing'), href: '/invoicing', icon: FileText, roles: ['admin', 'manager'] },
   { name: t('nav.treasury'), href: '/treasury', icon: Wallet, roles: ['admin', 'manager', 'accountant'] },
   { name: t('nav.settings'), href: '/settings', icon: Settings, roles: ['admin', 'manager'] },
 ];

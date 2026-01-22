@@ -21,7 +21,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import { Inventory } from "./pages/Inventory";
 import { CRM } from "./pages/CRM";
-import { Invoicing } from "./pages/Invoicing";
+
 import { Purchases } from "./pages/Purchases";
 import { Sales } from "./pages/Sales";
 import { StockTracking } from "./pages/StockTracking";
@@ -48,35 +48,35 @@ const App = () => (
                       <TreasuryProvider>
                         <SalesProvider>
                           <PurchasesProvider>
-                    <Toaster />
-                    <Sonner />
-                    <BrowserRouter>
-                      <Routes>
-                        <Route path="/login" element={<Login />} />
-                        <Route
-                          path="/*"
-                          element={
-                            <ProtectedRoute>
-                              <AppLayout>
-                                <Routes>
-                                  <Route path="/" element={<RoleBasedRoute><Index /></RoleBasedRoute>} />
-                                  <Route path="/inventory" element={<RoleBasedRoute><Inventory /></RoleBasedRoute>} />
-                                  <Route path="/crm" element={<RoleBasedRoute><CRM /></RoleBasedRoute>} />
-                                  <Route path="/invoicing" element={<RoleBasedRoute><Invoicing /></RoleBasedRoute>} />
-                                  <Route path="/purchases" element={<RoleBasedRoute><Purchases /></RoleBasedRoute>} />
-                                  <Route path="/sales" element={<RoleBasedRoute><Sales /></RoleBasedRoute>} />
-                                  <Route path="/stock-tracking" element={<RoleBasedRoute><StockTracking /></RoleBasedRoute>} />
-                                  <Route path="/tax-reports" element={<RoleBasedRoute><TaxReports /></RoleBasedRoute>} />
-                                  <Route path="/treasury" element={<RoleBasedRoute><Treasury /></RoleBasedRoute>} />
-                                  <Route path="/settings" element={<RoleBasedRoute><Settings /></RoleBasedRoute>} />
-                                  <Route path="*" element={<NotFound />} />
-                                </Routes>
-                              </AppLayout>
-                            </ProtectedRoute>
-                          }
-                        />
-                      </Routes>
-                    </BrowserRouter>
+                            <Toaster />
+                            <Sonner />
+                            <BrowserRouter>
+                              <Routes>
+                                <Route path="/login" element={<Login />} />
+                                <Route
+                                  path="/*"
+                                  element={
+                                    <ProtectedRoute>
+                                      <AppLayout>
+                                        <Routes>
+                                          <Route path="/" element={<RoleBasedRoute><Index /></RoleBasedRoute>} />
+                                          <Route path="/inventory" element={<RoleBasedRoute><Inventory /></RoleBasedRoute>} />
+                                          <Route path="/crm" element={<RoleBasedRoute><CRM /></RoleBasedRoute>} />
+
+                                          <Route path="/purchases" element={<RoleBasedRoute><Purchases /></RoleBasedRoute>} />
+                                          <Route path="/sales" element={<RoleBasedRoute><Sales /></RoleBasedRoute>} />
+                                          <Route path="/stock-tracking" element={<RoleBasedRoute><StockTracking /></RoleBasedRoute>} />
+                                          <Route path="/tax-reports" element={<RoleBasedRoute><TaxReports /></RoleBasedRoute>} />
+                                          <Route path="/treasury" element={<RoleBasedRoute><Treasury /></RoleBasedRoute>} />
+                                          <Route path="/settings" element={<RoleBasedRoute><Settings /></RoleBasedRoute>} />
+                                          <Route path="*" element={<NotFound />} />
+                                        </Routes>
+                                      </AppLayout>
+                                    </ProtectedRoute>
+                                  }
+                                />
+                              </Routes>
+                            </BrowserRouter>
                           </PurchasesProvider>
                         </SalesProvider>
                       </TreasuryProvider>

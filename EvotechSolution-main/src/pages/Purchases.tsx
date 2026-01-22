@@ -258,6 +258,40 @@ export const Purchases = () => {
     setViewingDocument(doc);
   };
 
+  // Format document ID with French prefix based on document type
+  const formatDocumentId = (id: string, docType: string): string => {
+    const prefixes: Record<string, string> = {
+      purchase_order: 'BC',
+      purchase_invoice: 'FA',
+      delivery_note: 'BL',
+    };
+
+    // Replace English database prefixes with French ones
+    if (id.startsWith('PO-')) return id.replace('PO-', 'BC-');
+    if (id.startsWith('PI-')) return id.replace('PI-', 'FA-');
+    if (id.startsWith('DN-')) return id.replace('DN-', 'BL-');
+
+    const prefix = prefixes[docType] || 'DOC';
+
+    // If ID already has a prefix, return as is
+    if (id.match(/^[A-Z]{2,4}-/)) {
+      return id;
+    }
+
+    // Otherwise, add the prefix
+    return `${prefix}-${id}`;
+  };
+
+  // Get supplier display name from document
+  const getSupplierDisplayName = (doc: PurchaseDocument): string => {
+    if (doc.supplierData) {
+      return doc.supplierData.company || doc.supplierData.name || doc.supplier || 'Unknown Supplier';
+    }
+    // Fallback: try to look up from contacts
+    const supplier = suppliers.find(s => s.id === doc.supplier);
+    return supplier ? (supplier.company || supplier.name) : doc.supplier || 'Unknown Supplier';
+  };
+
   const handleEditDocument = (doc: PurchaseDocument) => {
     setEditingDocument(doc);
     setEditFormData({
@@ -305,15 +339,15 @@ export const Purchases = () => {
     try {
       const docType = doc.type || activeTab;
 
-      // If supplierData is missing, try to find it from CRM using supplier name
+      // If supplierData is missing, try to find it from CRM using supplier ID
       let docWithSupplierData = { ...doc };
       if (!docWithSupplierData.supplierData && docWithSupplierData.supplier) {
-        // Try to find supplier by matching company or name
-        const foundSupplier = suppliers.find(s =>
-          s.company === docWithSupplierData.supplier ||
-          s.name === docWithSupplierData.supplier
-        );
+        console.log('Looking up supplier:', docWithSupplierData.supplier);
+        console.log('Available suppliers:', suppliers.length);
+        // Try to find supplier by ID (supplier field stores the UUID)
+        const foundSupplier = suppliers.find(s => s.id === docWithSupplierData.supplier);
         if (foundSupplier) {
+          console.log('Found supplier:', foundSupplier.company || foundSupplier.name);
           docWithSupplierData.supplierData = {
             id: foundSupplier.id,
             name: foundSupplier.name,
@@ -324,7 +358,11 @@ export const Purchases = () => {
             if_number: foundSupplier.ifNumber || null,
             rc: foundSupplier.rc || null,
           };
+        } else {
+          console.warn('Supplier not found in CRM. Supplier ID:', docWithSupplierData.supplier);
         }
+      } else if (docWithSupplierData.supplierData) {
+        console.log('Supplier data already present:', docWithSupplierData.supplierData.company || docWithSupplierData.supplierData.name);
       }
 
       // Prepare document data with items if available
@@ -361,13 +399,11 @@ export const Purchases = () => {
     try {
       const docType = doc.type || activeTab;
 
-      // If supplierData is missing, try to find it from CRM using supplier name
+      // If supplierData is missing, try to find it from CRM using supplier ID
       let docWithSupplierData = { ...doc };
       if (!docWithSupplierData.supplierData && docWithSupplierData.supplier) {
-        const foundSupplier = suppliers.find(s =>
-          s.company === docWithSupplierData.supplier ||
-          s.name === docWithSupplierData.supplier
-        );
+        // Try to find supplier by ID (supplier field stores the UUID)
+        const foundSupplier = suppliers.find(s => s.id === docWithSupplierData.supplier);
         if (foundSupplier) {
           docWithSupplierData.supplierData = {
             id: foundSupplier.id,
@@ -992,12 +1028,7 @@ export const Purchases = () => {
           <h1 className="text-2xl font-heading font-bold text-foreground">{t('purchases.title')}</h1>
           <p className="text-muted-foreground">{t('purchases.description')}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <Download className="w-4 h-4" />
-            {t('common.export')}
-          </Button>
-        </div>
+
       </div>
 
       {/* KPIs */}
@@ -2840,13 +2871,13 @@ export const Purchases = () => {
             <>
               <DialogHeader>
                 <DialogTitle>{getDocumentTitle()} Details</DialogTitle>
-                <DialogDescription>Document #{viewingDocument.id}</DialogDescription>
+                <DialogDescription>Document #{formatDocumentId(viewingDocument.id, viewingDocument.type)}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-muted-foreground">Supplier</Label>
-                    <p className="font-medium">{viewingDocument.supplier}</p>
+                    <p className="font-medium">{getSupplierDisplayName(viewingDocument)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Date</Label>

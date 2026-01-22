@@ -67,6 +67,41 @@ const getCompanyInfo = (providedCompanyInfo?: CompanyInfo): CompanyInfo => {
   return defaultCompanyInfo;
 };
 
+// Format document ID with French prefix based on document type
+const formatDocumentId = (id: string, docType: string): string => {
+  // Define French prefixes for each document type
+  const prefixes: Record<string, string> = {
+    invoice: 'FC',                    // Facture
+    estimate: 'DV',                   // Devis
+    delivery_note: 'BL',              // Bon de Livraison
+    purchase_order: 'BC',             // Bon de Commande
+    credit_note: 'AV',                // Avoir
+    statement: 'RL',                  // Relevé
+    purchase_invoice: 'FA',           // Facture d'Achat
+    purchase_delivery_note: 'BL',     // Bon de Livraison
+  };
+
+  const prefix = prefixes[docType] || 'DOC';
+
+  // Replace English database prefixes with French ones
+  if (id.startsWith('INV-')) return id.replace('INV-', 'FC-');
+  if (id.startsWith('EST-')) return id.replace('EST-', 'DV-');
+  if (id.startsWith('DN-')) return id.replace('DN-', 'BL-');
+  if (id.startsWith('DIV-')) return id.replace('DIV-', 'BL-');
+  if (id.startsWith('CN-')) return id.replace('CN-', 'AV-');
+  if (id.startsWith('ST-')) return id.replace('ST-', 'RL-');
+  if (id.startsWith('PO-')) return id.replace('PO-', 'BC-');
+  if (id.startsWith('PI-')) return id.replace('PI-', 'FA-');
+
+  // If ID already has a prefix, return as is
+  if (id.match(/^[A-Z]{2,4}-/)) {
+    return id;
+  }
+
+  // Otherwise, add the prefix
+  return `${prefix}-${id}`;
+};
+
 // Generate PDF using @react-pdf/renderer for vector PDF
 export const generatePDFFromTemplate = async (data: DocumentData): Promise<void> => {
   // Validate required data
@@ -83,6 +118,11 @@ export const generatePDFFromTemplate = async (data: DocumentData): Promise<void>
   // Try @react-pdf/renderer first, fallback to html2canvas if it fails
   try {
     console.log('Starting PDF generation with @react-pdf/renderer...');
+    console.log('PDF Template received clientData:', {
+      hasClientData: !!data.clientData,
+      clientDataName: data.clientData?.company || data.clientData?.name,
+      clientField: data.client
+    });
 
     // Create PDF document using React.createElement for better compatibility
     const pdfDoc = React.createElement(DocumentPDFTemplate, {
@@ -129,7 +169,8 @@ export const generatePDFFromTemplate = async (data: DocumentData): Promise<void>
     };
 
     const documentTypeName = getDocumentTypeName(data.type);
-    link.download = `${documentTypeName}_${data.documentId}.pdf`;
+    const formattedDocId = formatDocumentId(data.documentId, data.type);
+    link.download = `${documentTypeName}_${formattedDocId}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -290,7 +331,8 @@ const generatePDFWithHtml2Canvas = async (data: DocumentData, companyInfo: any):
         };
 
         const documentTypeName = getDocumentTypeName(data.type);
-        pdf.save(`${documentTypeName}_${data.documentId}.pdf`);
+        const formattedDocId = formatDocumentId(data.documentId, data.type);
+        pdf.save(`${documentTypeName}_${formattedDocId}.pdf`);
         resolve();
       } catch (error) {
         console.error('html2canvas PDF generation error:', error);
