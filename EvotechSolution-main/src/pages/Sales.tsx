@@ -1022,7 +1022,7 @@ export const Sales = () => {
             </div>
             <div>
               <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words overflow-visible whitespace-normal leading-tight">{formatMAD(totalRevenue)}</p>
-              <p className="text-sm text-muted-foreground">{t('sales.totalRevenue')}</p>
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('sales.totalRevenue')}>{t('sales.totalRevenue')}</p>
             </div>
           </div>
         </div>
@@ -1033,7 +1033,7 @@ export const Sales = () => {
             </div>
             <div>
               <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words overflow-visible whitespace-normal leading-tight">{invoices.length}</p>
-              <p className="text-sm text-muted-foreground">{t('documents.invoice')}</p>
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('documents.invoice')}>{t('documents.invoice')}</p>
             </div>
           </div>
         </div>
@@ -1044,7 +1044,7 @@ export const Sales = () => {
             </div>
             <div>
               <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words overflow-visible whitespace-normal leading-tight">{formatMAD(pendingRevenue)}</p>
-              <p className="text-sm text-muted-foreground">{t('sales.pendingRevenue')}</p>
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('sales.pendingRevenue')}>{t('sales.pendingRevenue')}</p>
             </div>
           </div>
         </div>
@@ -1057,7 +1057,7 @@ export const Sales = () => {
               <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words overflow-visible whitespace-normal leading-tight">
                 {new Set([...invoices, ...deliveryNotes, ...estimates].map(o => o.client)).size}
               </p>
-              <p className="text-sm text-muted-foreground">{t('sales.activeClients')}</p>
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('sales.activeClients')}>{t('sales.activeClients')}</p>
             </div>
           </div>
         </div>
@@ -1304,7 +1304,7 @@ export const Sales = () => {
                   <div className="card-elevated p-6 sticky top-6">
                     <div className="flex items-center gap-2 mb-4">
                       {documentType === 'delivery_note' ? <Package className="w-5 h-5 text-primary" /> : <FileText className="w-5 h-5 text-primary" />}
-                      <h3 className="font-heading font-semibold text-foreground">{t('documents.documentSummary', { documentType: getDocumentTitle() })}</h3>
+                      <h3 className="font-heading font-semibold text-foreground text-lg sm:text-base leading-tight">{t('documents.documentSummary', { documentType: getDocumentTitle() })}</h3>
                     </div>
                     <div className="space-y-3 overflow-visible">
                       <div className="flex justify-between py-2 border-b border-border gap-4 overflow-visible">

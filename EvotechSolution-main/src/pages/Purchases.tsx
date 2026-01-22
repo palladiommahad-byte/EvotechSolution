@@ -1009,7 +1009,7 @@ export const Purchases = () => {
             </div>
             <div>
               <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words overflow-visible whitespace-normal leading-tight">{purchaseOrders.length}</p>
-              <p className="text-sm text-muted-foreground">{t('documents.purchaseOrder')}</p>
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('documents.purchaseOrder')}>{t('documents.purchaseOrder')}</p>
             </div>
           </div>
         </div>
@@ -1022,7 +1022,7 @@ export const Purchases = () => {
               <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words overflow-visible whitespace-normal leading-tight">
                 {purchaseOrders.filter(o => o.status === 'pending').length}
               </p>
-              <p className="text-sm text-muted-foreground">{t('status.pending')}</p>
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('status.pending')}>{t('status.pending')}</p>
             </div>
           </div>
         </div>
@@ -1035,7 +1035,7 @@ export const Purchases = () => {
               <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words overflow-visible whitespace-normal leading-tight">
                 {deliveryNotes.length}
               </p>
-              <p className="text-sm text-muted-foreground">{t('documents.allDeliveryNotes')}</p>
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('documents.allDeliveryNotes')}>{t('documents.allDeliveryNotes')}</p>
             </div>
           </div>
         </div>
@@ -1046,7 +1046,7 @@ export const Purchases = () => {
             </div>
             <div>
               <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words overflow-visible whitespace-normal leading-tight">{formatMAD(totalPending)}</p>
-              <p className="text-sm text-muted-foreground">{t('purchases.pendingValue', { defaultValue: 'Pending Value' })}</p>
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('purchases.pendingValue', { defaultValue: 'Pending Value' })}>{t('purchases.pendingValue', { defaultValue: 'Pending Value' })}</p>
             </div>
           </div>
         </div>
@@ -1158,7 +1158,7 @@ export const Purchases = () => {
                                 products={products}
                                 value={item.productId}
                                 onSelect={(product) => handleProductSelect(item.id, product)}
-                                placeholder={t('common.search')}
+                                placeholder={t('documents.searchProduct')}
                               />
                             </div>
                             <div className="col-span-7">
@@ -1234,7 +1234,7 @@ export const Purchases = () => {
                   <div className="card-elevated p-6 sticky top-6">
                     <div className="flex items-center gap-2 mb-4">
                       {getDocumentIcon()}
-                      <h3 className="font-heading font-semibold text-foreground">{t('documents.documentSummary', { documentType: getDocumentTitle() })}</h3>
+                      <h3 className="font-heading font-semibold text-foreground text-lg sm:text-base leading-tight">{t('documents.documentSummary', { documentType: getDocumentTitle() })}</h3>
                     </div>
                     <div className="space-y-3 overflow-visible">
                       <div className="flex justify-between py-2 border-b border-border gap-4 overflow-visible">
@@ -1518,9 +1518,9 @@ export const Purchases = () => {
                     </div>
                     <div className="space-y-4">
                       {items.map((item) => (
-                        <div key={item.id} className="pb-4 border-b border-border/50 last:border-b-0">
-                          <div className="grid grid-cols-12 gap-4 items-end">
-                            <div className="col-span-3 min-w-0">
+                        <div key={item.id} className="p-4 border border-border rounded-lg space-y-4 bg-card">
+                          <div className="grid grid-cols-12 gap-4">
+                            <div className="col-span-12 md:col-span-5">
                               <Label className="text-xs font-medium mb-1.5 block">{t('documents.productOptional')}</Label>
                               <ProductSearch
                                 products={products}
@@ -1529,7 +1529,7 @@ export const Purchases = () => {
                                 placeholder={t('documents.searchProduct')}
                               />
                             </div>
-                            <div className="col-span-4 min-w-0">
+                            <div className="col-span-12 md:col-span-7">
                               <Label className="text-xs font-medium mb-1.5 block">{t('common.description')}</Label>
                               <Input
                                 placeholder={t('documents.itemDescription')}
@@ -1538,8 +1538,10 @@ export const Purchases = () => {
                                 className="w-full"
                               />
                             </div>
-                            <div className="col-span-1 min-w-[80px]">
-                              <Label className="text-xs font-medium mb-1.5 block">{t('common.quantity', { defaultValue: 'Qty' })}</Label>
+                          </div>
+                          <div className="grid grid-cols-12 gap-4 items-end">
+                            <div className="col-span-3 md:col-span-2">
+                              <Label className="text-xs font-medium mb-1.5 block">{t('common.quantity')}</Label>
                               <Input
                                 type="number"
                                 min="1"
@@ -1548,25 +1550,26 @@ export const Purchases = () => {
                                 className="w-full"
                               />
                             </div>
-                            <div className="col-span-2 min-w-[120px]">
-                              <Label className="text-xs font-medium mb-1.5 block">{t('documents.unitPrice', { defaultValue: 'Unit Price' })}</Label>
+                            <div className="col-span-4 md:col-span-4">
+                              <Label className="text-xs font-medium mb-1.5 block">{t('documents.unitPriceMAD')}</Label>
                               <Input
                                 type="number"
                                 min="0"
+                                step="0.01"
                                 value={item.unitPrice}
                                 onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                                 className="w-full"
                               />
                             </div>
-                            <div className="col-span-1 min-w-[100px]">
-                              <Label className="text-xs font-medium mb-1.5 block">{t('common.total')}</Label>
-                              <Input value={formatMAD(item.total)} disabled className="w-full text-xs font-medium" />
+                            <div className="col-span-3 md:col-span-4">
+                              <Label className="text-xs font-medium mb-1.5 block">{t('documents.totalMAD')}</Label>
+                              <Input value={formatMAD(item.total)} disabled className="w-full font-medium" />
                             </div>
-                            <div className="col-span-1 flex items-end pb-0.5">
+                            <div className="col-span-2 md:col-span-2 flex justify-end">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-destructive hover:text-destructive h-10 w-10"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-10 w-10"
                                 onClick={() => removeItem(item.id)}
                                 disabled={items.length === 1}
                                 title={t('documents.removeItem')}
@@ -1997,10 +2000,10 @@ export const Purchases = () => {
                     </div>
                     <div className="space-y-4">
                       {items.map((item) => (
-                        <div key={item.id} className="space-y-3">
-                          <div className="grid grid-cols-12 gap-3 items-end">
-                            <div className="col-span-3">
-                              <Label className="text-xs">{t('documents.productOptional')}</Label>
+                        <div key={item.id} className="p-4 border border-border rounded-lg space-y-4 bg-card">
+                          <div className="grid grid-cols-12 gap-4">
+                            <div className="col-span-12 md:col-span-5">
+                              <Label className="text-xs font-medium mb-1.5 block">{t('documents.productOptional')}</Label>
                               <ProductSearch
                                 products={products}
                                 value={item.productId}
@@ -2008,41 +2011,47 @@ export const Purchases = () => {
                                 placeholder={t('documents.searchProduct')}
                               />
                             </div>
-                            <div className="col-span-4">
-                              <Label className="text-xs">{t('common.description')}</Label>
+                            <div className="col-span-12 md:col-span-7">
+                              <Label className="text-xs font-medium mb-1.5 block">{t('common.description')}</Label>
                               <Input
                                 placeholder={t('documents.itemDescription')}
                                 value={item.description}
                                 onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                                className="w-full"
                               />
                             </div>
-                            <div className="col-span-1">
-                              <Label className="text-xs">{t('common.quantity', { defaultValue: 'Qty' })}</Label>
+                          </div>
+                          <div className="grid grid-cols-12 gap-4 items-end">
+                            <div className="col-span-3 md:col-span-2">
+                              <Label className="text-xs font-medium mb-1.5 block">{t('common.quantity')}</Label>
                               <Input
                                 type="number"
                                 min="1"
                                 value={item.quantity}
                                 onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                                className="w-full"
                               />
                             </div>
-                            <div className="col-span-2">
-                              <Label className="text-xs">{t('documents.unitPrice', { defaultValue: 'Unit Price' })}</Label>
+                            <div className="col-span-4 md:col-span-4">
+                              <Label className="text-xs font-medium mb-1.5 block">{t('documents.unitPriceMAD')}</Label>
                               <Input
                                 type="number"
                                 min="0"
+                                step="0.01"
                                 value={item.unitPrice}
                                 onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                className="w-full"
                               />
                             </div>
-                            <div className="col-span-1">
-                              <Label className="text-xs">{t('common.total')}</Label>
-                              <Input value={formatMAD(item.total)} disabled className="text-xs" />
+                            <div className="col-span-3 md:col-span-4">
+                              <Label className="text-xs font-medium mb-1.5 block">{t('documents.totalMAD')}</Label>
+                              <Input value={formatMAD(item.total)} disabled className="w-full font-medium" />
                             </div>
-                            <div className="col-span-1">
+                            <div className="col-span-2 md:col-span-2 flex justify-end">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-destructive hover:text-destructive h-10"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-10 w-10"
                                 onClick={() => removeItem(item.id)}
                                 disabled={items.length === 1}
                                 title={t('documents.removeItem')}

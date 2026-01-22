@@ -5,25 +5,18 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  Legend,
 } from 'recharts';
 import { ToggleButtonGroup } from '@/components/ui/ToggleButtonGroup';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { TopProduct } from '@/services/dashboard.service';
 
-const productData = [
-  { name: 'Phone Charger', quantity: 245, revenue: 122500, color: 'hsl(var(--primary))' },
-  { name: 'USB Flash Drive', quantity: 189, revenue: 94500, color: 'hsl(199, 89%, 48%)' },
-  { name: 'Notebook Set', quantity: 156, revenue: 78000, color: 'hsl(142, 76%, 36%)' },
-  { name: 'Desk Organizer', quantity: 134, revenue: 67000, color: 'hsl(262, 83%, 58%)' },
-  { name: 'Earphones', quantity: 121, revenue: 60500, color: 'hsl(346, 77%, 50%)' },
-  { name: 'Backpack', quantity: 98, revenue: 49000, color: 'hsl(38, 92%, 50%)' },
-  { name: 'LED Desk Lamp', quantity: 87, revenue: 43500, color: 'hsl(187, 85%, 43%)' },
-  { name: 'Pen Drive', quantity: 76, revenue: 38000, color: 'hsl(160, 84%, 39%)' },
-];
+interface TopProductsChartProps {
+  data?: TopProduct[];
+}
 
 type ViewMode = 'quantity' | 'revenue';
 
-export const TopProductsChart = () => {
+export const TopProductsChart = ({ data: productData = [] }: TopProductsChartProps) => {
   const [viewMode, setViewMode] = useState<ViewMode>('quantity');
 
   const dataKey = viewMode === 'quantity' ? 'quantity' : 'revenue';

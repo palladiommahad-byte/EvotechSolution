@@ -110,18 +110,18 @@ export const settingsService = {
   async getCompanySettings(): Promise<CompanySettings | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
         .limit(1)
         .single();
-      
+
       if (error) {
         console.error('Error fetching company settings:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error fetching company settings:', error);
@@ -136,10 +136,10 @@ export const settingsService = {
   async updateCompanySettings(settings: Partial<CompanySettings>): Promise<CompanySettings | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       // First, check if settings exist
       const existing = await this.getCompanySettings();
-      
+
       if (!existing) {
         // Create if doesn't exist
         const { data, error } = await supabase
@@ -160,12 +160,12 @@ export const settingsService = {
           })
           .select()
           .single();
-        
+
         if (error) {
           console.error('Error creating company settings:', error);
           return null;
         }
-        
+
         return data;
       } else {
         // Update existing
@@ -178,12 +178,12 @@ export const settingsService = {
           .eq('id', existing.id)
           .select()
           .single();
-        
+
         if (error) {
           console.error('Error updating company settings:', error);
           return null;
         }
-        
+
         return data;
       }
     } catch (error) {
@@ -207,15 +207,15 @@ export const settingsService = {
         console.warn('Invalid UUID format for user_id:', userId);
         return null;
       }
-      
+
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('user_preferences')
         .select('*')
         .eq('user_id', userId)
         .single();
-      
+
       if (error) {
         // If not found, return null (preferences will be created on first update)
         if (error.code === 'PGRST116') {
@@ -224,7 +224,7 @@ export const settingsService = {
         console.error('Error fetching user preferences:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error fetching user preferences:', error);
@@ -242,10 +242,10 @@ export const settingsService = {
   ): Promise<UserPreferences | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       // Check if preferences exist
       const existing = await this.getUserPreferences(userId);
-      
+
       if (!existing) {
         // Create new preferences
         const { data, error } = await supabase
@@ -253,6 +253,7 @@ export const settingsService = {
           .insert({
             user_id: userId,
             theme_color: preferences.theme_color || 'navy',
+            language: preferences.language || 'en',
             active_warehouse_id: preferences.active_warehouse_id,
             browser_notifications_enabled: preferences.browser_notifications_enabled ?? true,
             low_stock_alerts_enabled: preferences.low_stock_alerts_enabled ?? true,
@@ -260,12 +261,12 @@ export const settingsService = {
           })
           .select()
           .single();
-        
+
         if (error) {
           console.error('Error creating user preferences:', error);
           return null;
         }
-        
+
         return data;
       } else {
         // Update existing preferences
@@ -278,12 +279,12 @@ export const settingsService = {
           .eq('id', existing.id)
           .select()
           .single();
-        
+
         if (error) {
           console.error('Error updating user preferences:', error);
           return null;
         }
-        
+
         return data;
       }
     } catch (error) {
@@ -302,17 +303,17 @@ export const settingsService = {
   async getWarehouses(): Promise<Warehouse[]> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('warehouses')
         .select('*')
         .order('name', { ascending: true });
-      
+
       if (error) {
         console.error('Error fetching warehouses:', error);
         return [];
       }
-      
+
       return data || [];
     } catch (error) {
       console.error('Error fetching warehouses:', error);
@@ -326,18 +327,18 @@ export const settingsService = {
   async getWarehouseById(id: string): Promise<Warehouse | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('warehouses')
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (error) {
         console.error('Error fetching warehouse:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error fetching warehouse:', error);
@@ -351,10 +352,10 @@ export const settingsService = {
   async createWarehouse(warehouse: Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>): Promise<Warehouse | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       // Generate ID from name (lowercase, replace spaces with hyphens)
       const id = warehouse.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      
+
       const { data, error } = await supabase
         .from('warehouses')
         .insert({
@@ -367,12 +368,12 @@ export const settingsService = {
         })
         .select()
         .single();
-      
+
       if (error) {
         console.error('Error creating warehouse:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error creating warehouse:', error);
@@ -386,7 +387,7 @@ export const settingsService = {
   async updateWarehouse(id: string, warehouse: Partial<Omit<Warehouse, 'id' | 'created_at'>>): Promise<Warehouse | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('warehouses')
         .update({
@@ -396,12 +397,12 @@ export const settingsService = {
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) {
         console.error('Error updating warehouse:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error updating warehouse:', error);
@@ -415,17 +416,17 @@ export const settingsService = {
   async deleteWarehouse(id: string): Promise<boolean> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { error } = await supabase
         .from('warehouses')
         .delete()
         .eq('id', id);
-      
+
       if (error) {
         console.error('Error deleting warehouse:', error);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error deleting warehouse:', error);
@@ -443,17 +444,17 @@ export const settingsService = {
   async getUsers(): Promise<User[]> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .order('name', { ascending: true });
-      
+
       if (error) {
         console.error('Error fetching users:', error);
         return [];
       }
-      
+
       return data || [];
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -472,20 +473,20 @@ export const settingsService = {
         console.warn('Invalid UUID format for user id:', id);
         return null;
       }
-      
+
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (error) {
         console.error('Error fetching user:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -499,13 +500,13 @@ export const settingsService = {
   async getUserByEmail(email: string): Promise<User | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('email', email)
         .single();
-      
+
       if (error) {
         if (error.code === 'PGRST116') {
           return null; // User not found
@@ -513,7 +514,7 @@ export const settingsService = {
         console.error('Error fetching user by email:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error fetching user by email:', error);
@@ -528,7 +529,7 @@ export const settingsService = {
   async createUser(user: Omit<User, 'id' | 'created_at' | 'updated_at' | 'last_login'>): Promise<User | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('users')
         .insert({
@@ -541,12 +542,12 @@ export const settingsService = {
         })
         .select()
         .single();
-      
+
       if (error) {
         console.error('Error creating user:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error creating user:', error);
@@ -560,29 +561,29 @@ export const settingsService = {
   async updateUser(id: string, user: Partial<Omit<User, 'id' | 'created_at'>>): Promise<User | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const updateData: any = {
         ...user,
         updated_at: new Date().toISOString(),
       };
-      
+
       // Don't update password_hash if not provided
       if (!user.password_hash) {
         delete updateData.password_hash;
       }
-      
+
       const { data, error } = await supabase
         .from('users')
         .update(updateData)
         .eq('id', id)
         .select()
         .single();
-      
+
       if (error) {
         console.error('Error updating user:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error updating user:', error);
@@ -596,17 +597,17 @@ export const settingsService = {
   async deleteUser(id: string): Promise<boolean> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { error } = await supabase
         .from('users')
         .delete()
         .eq('id', id);
-      
+
       if (error) {
         console.error('Error deleting user:', error);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -620,19 +621,19 @@ export const settingsService = {
   async updateUserLastLogin(id: string): Promise<boolean> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { error } = await supabase
         .from('users')
         .update({
           last_login: new Date().toISOString(),
         })
         .eq('id', id);
-      
+
       if (error) {
         console.error('Error updating user last login:', error);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error updating user last login:', error);
@@ -652,27 +653,27 @@ export const settingsService = {
       // Validate UUID format if userId is provided
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const validUserId = userId && uuidRegex.test(userId) ? userId : null;
-      
+
       const supabase = getSupabaseClient();
-      
+
       let query = supabase
         .from('notifications')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (validUserId) {
         query = query.or(`user_id.eq.${validUserId},user_id.is.null`);
       } else {
         query = query.is('user_id', null);
       }
-      
+
       const { data, error } = await query;
-      
+
       if (error) {
         console.error('Error fetching notifications:', error);
         return [];
       }
-      
+
       return data || [];
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -688,27 +689,27 @@ export const settingsService = {
       // Validate UUID format if userId is provided
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const validUserId = userId && uuidRegex.test(userId) ? userId : null;
-      
+
       const supabase = getSupabaseClient();
-      
+
       let query = supabase
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('read', false);
-      
+
       if (validUserId) {
         query = query.or(`user_id.eq.${validUserId},user_id.is.null`);
       } else {
         query = query.is('user_id', null);
       }
-      
+
       const { count, error } = await query;
-      
+
       if (error) {
         console.error('Error fetching unread notifications count:', error);
         return 0;
       }
-      
+
       return count || 0;
     } catch (error) {
       console.error('Error fetching unread notifications count:', error);
@@ -722,7 +723,7 @@ export const settingsService = {
   async createNotification(notification: Omit<Notification, 'id' | 'created_at' | 'read_at'>): Promise<Notification | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { data, error } = await supabase
         .from('notifications')
         .insert({
@@ -736,12 +737,12 @@ export const settingsService = {
         })
         .select()
         .single();
-      
+
       if (error) {
         console.error('Error creating notification:', error);
         return null;
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error creating notification:', error);
@@ -755,7 +756,7 @@ export const settingsService = {
   async markNotificationAsRead(id: string): Promise<boolean> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { error } = await supabase
         .from('notifications')
         .update({
@@ -763,12 +764,12 @@ export const settingsService = {
           read_at: new Date().toISOString(),
         })
         .eq('id', id);
-      
+
       if (error) {
         console.error('Error marking notification as read:', error);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -782,7 +783,7 @@ export const settingsService = {
   async markAllNotificationsAsRead(userId?: string | null): Promise<boolean> {
     try {
       const supabase = getSupabaseClient();
-      
+
       let query = supabase
         .from('notifications')
         .update({
@@ -790,20 +791,20 @@ export const settingsService = {
           read_at: new Date().toISOString(),
         })
         .eq('read', false);
-      
+
       if (userId) {
         query = query.or(`user_id.eq.${userId},user_id.is.null`);
       } else {
         query = query.is('user_id', null);
       }
-      
+
       const { error } = await query;
-      
+
       if (error) {
         console.error('Error marking all notifications as read:', error);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
@@ -817,17 +818,17 @@ export const settingsService = {
   async deleteNotification(id: string): Promise<boolean> {
     try {
       const supabase = getSupabaseClient();
-      
+
       const { error } = await supabase
         .from('notifications')
         .delete()
         .eq('id', id);
-      
+
       if (error) {
         console.error('Error deleting notification:', error);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error deleting notification:', error);
@@ -841,24 +842,24 @@ export const settingsService = {
   async deleteAllNotifications(userId?: string | null): Promise<boolean> {
     try {
       const supabase = getSupabaseClient();
-      
+
       let query = supabase
         .from('notifications')
         .delete();
-      
+
       if (userId) {
         query = query.or(`user_id.eq.${userId},user_id.is.null`);
       } else {
         query = query.is('user_id', null);
       }
-      
+
       const { error } = await query;
-      
+
       if (error) {
         console.error('Error deleting all notifications:', error);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error deleting all notifications:', error);

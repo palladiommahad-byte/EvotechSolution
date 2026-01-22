@@ -8,17 +8,13 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import { StockByCategory } from '@/services/dashboard.service';
 
-const data = [
-  { category: 'Electronics', stock: 1240, color: 'hsl(222, 47%, 17%)' },
-  { category: 'Machinery', stock: 856, color: 'hsl(222, 47%, 30%)' },
-  { category: 'Raw Materials', stock: 2340, color: 'hsl(222, 47%, 40%)' },
-  { category: 'Components', stock: 1890, color: 'hsl(222, 47%, 50%)' },
-  { category: 'Tools', stock: 654, color: 'hsl(222, 47%, 60%)' },
-  { category: 'Safety', stock: 432, color: 'hsl(222, 47%, 70%)' },
-];
+interface StockByCategoryChartProps {
+  data?: StockByCategory[];
+}
 
-export const StockByCategoryChart = () => {
+export const StockByCategoryChart = ({ data = [] }: StockByCategoryChartProps) => {
   return (
     <div className="card-elevated p-6 animate-slide-up">
       <div className="mb-6">

@@ -1,19 +1,10 @@
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StockAlert } from '@/services/dashboard.service';
 
-interface StockItem {
-  name: string;
-  sku: string;
-  stock: number;
-  threshold: number;
+interface StockAlertCardProps {
+  data?: StockAlert[];
 }
-
-const stockItems: StockItem[] = [
-  { name: 'Wall Clock', sku: 'SKU-11', stock: 1, threshold: 5 },
-  { name: 'LED Desk Lamp', sku: 'SKU-2', stock: 12, threshold: 15 },
-  { name: 'Backpack', sku: 'SKU-6', stock: 20, threshold: 25 },
-  { name: 'Desk Organizer', sku: 'SKU-9', stock: 31, threshold: 40 },
-];
 
 const getStockStatus = (stock: number, threshold: number) => {
   const ratio = stock / threshold;
@@ -23,7 +14,7 @@ const getStockStatus = (stock: number, threshold: number) => {
   return { label: 'Good', color: 'bg-success text-success-foreground' };
 };
 
-export const StockAlertCard = () => {
+export const StockAlertCard = ({ data: stockItems = [] }: StockAlertCardProps) => {
   const criticalCount = stockItems.filter(item => item.stock / item.threshold <= 0.2).length;
 
   return (
@@ -61,8 +52,8 @@ export const StockAlertCard = () => {
                       <div className={cn(
                         "w-2 h-2 rounded-full flex-shrink-0",
                         item.stock / item.threshold <= 0.2 ? 'bg-destructive' :
-                        item.stock / item.threshold <= 0.5 ? 'bg-warning' :
-                        item.stock / item.threshold <= 0.8 ? 'bg-info' : 'bg-success'
+                          item.stock / item.threshold <= 0.5 ? 'bg-warning' :
+                            item.stock / item.threshold <= 0.8 ? 'bg-info' : 'bg-success'
                       )} />
                       <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
                     </div>

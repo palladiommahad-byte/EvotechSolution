@@ -19,18 +19,10 @@ export const ThemeSync = () => {
   // Sync theme from database when user preferences load
   useEffect(() => {
     if (!setTheme || !currentTheme) return;
-    
+
     if (userPreferences?.theme_color && Object.keys(themeColors).includes(userPreferences.theme_color)) {
       if (userPreferences.theme_color !== currentTheme) {
         setTheme(userPreferences.theme_color as typeof currentTheme);
-        // Also update localStorage as backup
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem('app-theme-color', userPreferences.theme_color);
-          } catch (error) {
-            console.warn('Error saving theme to localStorage:', error);
-          }
-        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -41,7 +33,7 @@ export const ThemeSync = () => {
     if (!updatePreferencesMutation || !user?.id || !userPreferences || userPreferences.theme_color === undefined) {
       return;
     }
-    
+
     // Only save if theme changed by user action, not during initial sync
     if (userPreferences.theme_color !== currentTheme) {
       // Use a small delay to avoid race conditions

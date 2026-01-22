@@ -25,6 +25,9 @@ export const Dashboard = () => {
     stockValue,
     salesChartData,
     revenueChartData,
+    stockByCategory,
+    topProducts,
+    stockAlerts,
     isLoading,
   } = useDashboardData();
 
@@ -197,9 +200,9 @@ export const Dashboard = () => {
 
       {/* Charts Row - Secondary Analytics - 2 columns per row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <StockByCategoryChart />
-        <TopProductsChart />
-        <StockAlertCard />
+        <StockByCategoryChart data={stockByCategory} />
+        <TopProductsChart data={topProducts} />
+        <StockAlertCard data={stockAlerts} />
         <InventoryStatsCard />
       </div>
 

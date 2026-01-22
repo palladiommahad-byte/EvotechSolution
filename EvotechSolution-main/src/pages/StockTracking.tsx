@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Package, AlertTriangle, CheckCircle, XCircle, TrendingUp, TrendingDown, MapPin, Building2, Check, LayoutGrid, List, History, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useWarehouse, type Warehouse } from '@/contexts/WarehouseContext';
 import { useProducts, StockItem } from '@/contexts/ProductsContext';
 import { productsService, StockMovement } from '@/services/products.service';
@@ -43,6 +44,7 @@ const StockIndicator = ({ level }: { level: 'out' | 'low' | 'medium' | 'good' })
 };
 
 export const StockTracking = () => {
+  const { t } = useTranslation();
   const { activeWarehouse, setActiveWarehouse, warehouseInfo, isAllWarehouses, warehouses } = useWarehouse();
   const { stockItems, products } = useProducts();
   const [viewMode, setViewMode] = useState<'grid' | 'all'>('all');
@@ -220,11 +222,11 @@ export const StockTracking = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="levels" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
-            Stock Levels
+            {t('stockTracking.tabs.levels')}
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="w-4 h-4" />
-            Movement History
+            {t('stockTracking.tabs.history')}
           </TabsTrigger>
         </TabsList>
 
@@ -233,22 +235,22 @@ export const StockTracking = () => {
           {/* Legend */}
           <div className="card-elevated p-4">
             <div className="flex flex-wrap items-center gap-6">
-              <span className="text-sm font-medium text-foreground">Stock Level:</span>
+              <span className="text-sm font-medium text-foreground">{t('stockTracking.legend.label')}</span>
               <div className="flex items-center gap-2">
                 <StockIndicator level="good" />
-                <span className="text-sm text-muted-foreground">Good</span>
+                <span className="text-sm text-muted-foreground">{t('stockTracking.legend.good')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <StockIndicator level="medium" />
-                <span className="text-sm text-muted-foreground">Medium</span>
+                <span className="text-sm text-muted-foreground">{t('stockTracking.legend.medium')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <StockIndicator level="low" />
-                <span className="text-sm text-muted-foreground">Low</span>
+                <span className="text-sm text-muted-foreground">{t('stockTracking.legend.low')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <StockIndicator level="out" />
-                <span className="text-sm text-muted-foreground">Out of Stock</span>
+                <span className="text-sm text-muted-foreground">{t('stockTracking.legend.outOfStock')}</span>
               </div>
             </div>
           </div>
@@ -308,13 +310,13 @@ export const StockTracking = () => {
                           );
                         })}
                         <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
-                          <span className="font-medium text-foreground">Total</span>
+                          <span className="font-medium text-foreground">{t('stockTracking.card.total')}</span>
                           <span className="font-bold text-foreground">{getTotalStock(item)}</span>
                         </div>
                       </div>
                     ) : (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Stock</span>
+                        <span className="text-sm text-muted-foreground">{t('stockTracking.table.stock')}</span>
                         <span className={cn(
                           "text-2xl font-heading font-bold",
                           level === 'out' && 'text-destructive',
@@ -329,23 +331,23 @@ export const StockTracking = () => {
 
                     <div className="mt-3 pt-3 border-t border-border">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Min. Stock: {item.minStock}</span>
+                        <span className="text-muted-foreground">{t('stockTracking.card.minStock')} {item.minStock}</span>
                         {level === 'out' && (
                           <span className="flex items-center gap-1 text-destructive">
                             <XCircle className="w-3 h-3" />
-                            Reorder
+                            {t('stockTracking.card.reorder')}
                           </span>
                         )}
                         {level === 'low' && (
                           <span className="flex items-center gap-1 text-warning">
                             <AlertTriangle className="w-3 h-3" />
-                            Low
+                            {t('stockTracking.card.low')}
                           </span>
                         )}
                         {(level === 'good' || level === 'medium') && (
                           <span className="flex items-center gap-1 text-success">
                             <CheckCircle className="w-3 h-3" />
-                            OK
+                            {t('stockTracking.card.ok')}
                           </span>
                         )}
                       </div>
@@ -359,22 +361,22 @@ export const StockTracking = () => {
               <Table>
                 <TableHeader>
                   <TableRow className="data-table-header hover:bg-section">
-                    <TableHead className="w-[50px]">Status</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Category</TableHead>
+                    <TableHead className="w-[50px]">{t('stockTracking.table.status')}</TableHead>
+                    <TableHead>{t('stockTracking.table.product')}</TableHead>
+                    <TableHead>{t('inventory.sku')}</TableHead>
+                    <TableHead>{t('stockTracking.table.category')}</TableHead>
                     {(isAllWarehouses || viewMode === 'all') ? (
                       <>
                         <TableHead className="text-center">Marrakech</TableHead>
                         <TableHead className="text-center">Agadir</TableHead>
                         <TableHead className="text-center">Ouarzazate</TableHead>
-                        <TableHead className="text-center font-bold">Total</TableHead>
+                        <TableHead className="text-center font-bold">{t('stockTracking.card.total')}</TableHead>
                       </>
                     ) : (
-                      <TableHead className="text-center">Stock</TableHead>
+                      <TableHead className="text-center">{t('stockTracking.table.stock')}</TableHead>
                     )}
-                    <TableHead className="text-center">Min Stock</TableHead>
-                    <TableHead className="text-center">Movement</TableHead>
+                    <TableHead className="text-center">{t('stockTracking.table.minStock')}</TableHead>
+                    <TableHead className="text-center">{t('stockTracking.table.movement')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -463,25 +465,25 @@ export const StockTracking = () => {
             <Table>
               <TableHeader>
                 <TableRow className="data-table-header hover:bg-section">
-                  <TableHead>Date</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead>{t('stockTracking.table.date')}</TableHead>
+                  <TableHead>{t('stockTracking.table.product')}</TableHead>
+                  <TableHead>{t('stockTracking.table.type')}</TableHead>
+                  <TableHead>{t('stockTracking.table.reference')}</TableHead>
+                  <TableHead>{t('stockTracking.table.description')}</TableHead>
+                  <TableHead className="text-right">{t('stockTracking.table.quantity')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingMovements ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      Loading movements...
+                      {t('stockTracking.table.loading')}
                     </TableCell>
                   </TableRow>
                 ) : movements.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No stock movements recorded yet.
+                      {t('stockTracking.table.noMovements')}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -495,7 +497,7 @@ export const StockTracking = () => {
                       </TableCell>
                       <TableCell>
                         <span className="font-medium text-foreground">
-                          {(movement as any).product?.name || 'Unknown Product'}
+                          {(movement as any).product?.name || t('stockTracking.table.unknownProduct')}
                         </span>
                         <span className="text-xs text-muted-foreground block">
                           {(movement as any).product?.sku}

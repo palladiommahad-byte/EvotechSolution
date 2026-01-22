@@ -22,13 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useTranslation } from 'react-i18next';
 
-interface TeamUser {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'manager' | 'accountant' | 'staff';
-  status: 'active' | 'inactive';
-}
+
 
 // Navigation items with translation keys
 const getNavigationItems = (t: (key: string) => string) => [
@@ -53,43 +47,19 @@ export const AppSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { user: authUser } = useAuth();
   const { companyInfo } = useCompany();
-  const [teamUser, setTeamUser] = useState<TeamUser | null>(null);
-  
+
   const companyName = companyInfo.name || 'My Store';
   const companyLogo = companyInfo.logo;
-  
-  // Load team user from localStorage (Users & Roles)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && authUser) {
-      try {
-        const saved = localStorage.getItem('teamUsers');
-        if (saved) {
-          const teamUsers: TeamUser[] = JSON.parse(saved);
-          // Match by email first, then by ID
-          const matchedUser = teamUsers.find(
-            tu => tu.email === authUser.email || tu.id === authUser.id
-          );
-          if (matchedUser) {
-            setTeamUser(matchedUser);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading team user from localStorage:', error);
-      }
-    }
-  }, [authUser]);
-  
-  // Use team user data if available, otherwise fall back to auth user
-  const displayUser = teamUser || authUser;
-  const displayName = displayUser?.name || 'User';
-  const displayRole = displayUser?.role || 'staff';
-  
+
   // Filter navigation based on user role
-  const userRole = displayRole;
+  const userRole = authUser?.role || 'staff';
   const allNavigationItems = getNavigationItems(t);
   const allSecondaryNavItems = getSecondaryNavItems(t);
   const navigation = allNavigationItems.filter(item => item.roles.includes(userRole));
   const secondaryNav = allSecondaryNavItems.filter(item => item.roles.includes(userRole));
+
+  const displayName = authUser?.name || 'User';
+  const displayRole = authUser?.role || 'staff';
 
   return (
     <aside
@@ -104,9 +74,9 @@ export const AppSidebar = () => {
           <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             {companyLogo ? (
               <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white/10 flex-shrink-0">
-                <img 
-                  src={companyLogo} 
-                  alt={companyName} 
+                <img
+                  src={companyLogo}
+                  alt={companyName}
                   className="w-full h-full object-contain p-0.5"
                 />
               </div>
@@ -115,7 +85,7 @@ export const AppSidebar = () => {
                 <Package className="w-5 h-5 text-white" />
               </div>
             )}
-            <span 
+            <span
               className={cn(
                 "font-heading font-bold text-primary-foreground leading-tight truncate min-w-0 flex-1 block",
                 companyName.length > 25 ? "text-xs" : companyName.length > 18 ? "text-sm" : "text-base"
@@ -130,9 +100,9 @@ export const AppSidebar = () => {
           <div className="relative group">
             {companyLogo ? (
               <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white/10">
-                <img 
-                  src={companyLogo} 
-                  alt={companyName} 
+                <img
+                  src={companyLogo}
+                  alt={companyName}
                   className="w-full h-full object-contain p-0.5"
                 />
               </div>
@@ -173,11 +143,11 @@ export const AppSidebar = () => {
                 title={collapsed ? item.name : undefined}
                 className={cn(
                   "flex items-center rounded-lg text-sm font-medium transition-all duration-200 relative group",
-                  collapsed 
-                    ? "justify-center px-2 py-2.5 w-full" 
+                  collapsed
+                    ? "justify-center px-2 py-2.5 w-full"
                     : "gap-3 px-3 py-2.5",
-                  isActive 
-                    ? "bg-primary-foreground text-primary shadow-sm" 
+                  isActive
+                    ? "bg-primary-foreground text-primary shadow-sm"
                     : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
                 )}
               >
@@ -192,10 +162,10 @@ export const AppSidebar = () => {
             );
           })}
         </div>
-        
+
         {/* Divider */}
         <div className={cn("border-t border-primary-foreground/20", collapsed ? "mx-2 my-4" : "my-4")} />
-        
+
         {/* Secondary Navigation */}
         <div className={cn("space-y-1", collapsed ? "px-2" : "px-3")}>
           {secondaryNav.map((item) => {
@@ -207,11 +177,11 @@ export const AppSidebar = () => {
                 title={collapsed ? item.name : undefined}
                 className={cn(
                   "flex items-center rounded-lg text-sm font-medium transition-all duration-200 relative group",
-                  collapsed 
-                    ? "justify-center px-2 py-2.5 w-full" 
+                  collapsed
+                    ? "justify-center px-2 py-2.5 w-full"
                     : "gap-3 px-3 py-2.5",
-                  isActive 
-                    ? "bg-primary-foreground text-primary shadow-sm" 
+                  isActive
+                    ? "bg-primary-foreground text-primary shadow-sm"
                     : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
                 )}
               >

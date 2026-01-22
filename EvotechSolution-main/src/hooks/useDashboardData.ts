@@ -53,6 +53,24 @@ export const useDashboardData = () => {
     staleTime: 300000,
   });
 
+  const { data: stockByCategory, isLoading: stockByCategoryLoading } = useQuery({
+    queryKey: ['dashboard', 'stock-by-category'],
+    queryFn: () => dashboardService.getStockByCategory(),
+    staleTime: 300000,
+  });
+
+  const { data: topProducts, isLoading: topProductsLoading } = useQuery({
+    queryKey: ['dashboard', 'top-products'],
+    queryFn: () => dashboardService.getTopProducts(),
+    staleTime: 300000,
+  });
+
+  const { data: stockAlerts, isLoading: stockAlertsLoading } = useQuery({
+    queryKey: ['dashboard', 'stock-alerts'],
+    queryFn: () => dashboardService.getLowStockAlerts(),
+    staleTime: 60000,
+  });
+
   return {
     kpis: kpis || {
       total_sales: '0',
@@ -66,6 +84,9 @@ export const useDashboardData = () => {
     earningsComparison: earningsComparison || { current: 0, previous: 0 },
     ordersComparison: ordersComparison || { current: 0, previous: 0 },
     stockValue: stockValue || 0,
+    stockByCategory: stockByCategory || [],
+    topProducts: topProducts || [],
+    stockAlerts: stockAlerts || [],
     isLoading:
       kpisLoading ||
       salesChartLoading ||
@@ -73,6 +94,9 @@ export const useDashboardData = () => {
       salesComparisonLoading ||
       earningsComparisonLoading ||
       ordersComparisonLoading ||
-      stockValueLoading,
+      stockValueLoading ||
+      stockByCategoryLoading ||
+      topProductsLoading ||
+      stockAlertsLoading,
   };
 };

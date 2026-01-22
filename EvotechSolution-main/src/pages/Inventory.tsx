@@ -1,6 +1,8 @@
 import { useState, useRef, ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Search, Filter, Download, ArrowUpDown, Package, Eye, Edit, Trash2, FolderPlus, FileText, FileSpreadsheet, ChevronDown, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +22,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,6 +67,7 @@ import { useToast } from '@/hooks/use-toast';
 const productUnits = ['Piece', 'kg', 'Liter', 'Box', 'Pack', 'Meter', 'Square Meter', 'Cubic Meter', 'Ton', 'Gram'] as const;
 
 export const Inventory = () => {
+  const { t } = useTranslation();
   const { warehouseInfo, isAllWarehouses, activeWarehouse, setActiveWarehouse, warehouses } = useWarehouse();
   const { toast } = useToast();
   const { products, stockItems, addProduct, updateProduct, deleteProduct } = useProducts();
@@ -96,35 +105,35 @@ export const Inventory = () => {
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchQuery.toLowerCase());
+      product.sku.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
     const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
-    
+
     // Filter by new/old products (based on last movement date - new: last 30 days, old: older than 30 days)
     let matchesAge = true;
     if (ageFilter !== 'all') {
       const lastMovementDate = new Date(product.lastMovement);
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+
       if (ageFilter === 'new') {
         matchesAge = lastMovementDate >= thirtyDaysAgo;
       } else if (ageFilter === 'old') {
         matchesAge = lastMovementDate < thirtyDaysAgo;
       }
     }
-    
+
     return matchesSearch && matchesCategory && matchesStatus && matchesAge;
   });
 
   const getStatusBadge = (status: Product['status']) => {
     switch (status) {
       case 'in_stock':
-        return <StatusBadge status="success">In Stock</StatusBadge>;
+        return <StatusBadge status="success">{t('inventory.inStock')}</StatusBadge>;
       case 'low_stock':
-        return <StatusBadge status="warning">Low Stock</StatusBadge>;
+        return <StatusBadge status="warning">{t('inventory.lowStock')}</StatusBadge>;
       case 'out_of_stock':
-        return <StatusBadge status="danger">Out of Stock</StatusBadge>;
+        return <StatusBadge status="danger">{t('inventory.outOfStock')}</StatusBadge>;
     }
   };
 
@@ -158,8 +167,8 @@ export const Inventory = () => {
       // Set the new category as the active filter
       setCategoryFilter(trimmedName);
       toast({
-        title: "Category Created",
-        description: `Category "${trimmedName}" has been created successfully.`,
+        title: t('inventory.categoryCreated'),
+        description: t('inventory.categoryCreatedDescription', { name: trimmedName }),
       });
     }
   };
@@ -190,8 +199,8 @@ export const Inventory = () => {
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
         toast({
-          title: "Error",
-          description: "Image file size must be less than 5MB.",
+          title: t('common.error'),
+          description: t('inventory.imageSizeError'),
           variant: "destructive",
         });
         return;
@@ -221,8 +230,8 @@ export const Inventory = () => {
     if (editingProduct) {
       if (!editFormData.name || !editFormData.sku || !editFormData.category) {
         toast({
-          title: "Error",
-          description: "Please fill in Product Name, SKU, and Category.",
+          title: t('common.error'),
+          description: t('inventory.addValidProductData'),
           variant: "destructive",
         });
         return;
@@ -233,14 +242,14 @@ export const Inventory = () => {
         setEditingProduct(null);
         setEditFormData({});
         toast({
-          title: "Product Updated",
-          description: `Product "${productName}" has been updated successfully.`,
+          title: t('inventory.productUpdated'),
+          description: t('inventory.productUpdatedDescription', { name: productName }),
         });
       } catch (error) {
         console.error('Error updating product:', error);
         toast({
-          title: "Error",
-          description: "Failed to update product. Please try again.",
+          title: t('common.error'),
+          description: t('common.errorOccurred'), // Assuming generic error key exists or t('inventory.failedToUpdate')
           variant: "destructive",
         });
       }
@@ -267,8 +276,8 @@ export const Inventory = () => {
   const handleSaveNewProduct = async () => {
     if (!newProductData.name || !newProductData.sku || !newProductData.category) {
       toast({
-        title: "Error",
-        description: "Please fill in Product Name, SKU, and Category.",
+        title: t('common.error'),
+        description: t('inventory.addValidProductData'),
         variant: "destructive",
       });
       return;
@@ -277,17 +286,17 @@ export const Inventory = () => {
     // Check if SKU already exists
     if (products.some(p => p.sku === newProductData.sku)) {
       toast({
-        title: "Error",
-        description: "A product with this SKU already exists. Please use a different SKU.",
+        title: t('common.error'),
+        description: t('inventory.skuExists'),
         variant: "destructive",
       });
       return;
     }
 
     // Calculate total stock from warehouse allocations
-    const totalStock = (warehouseStock.marrakech || 0) + 
-                      (warehouseStock.agadir || 0) + 
-                      (warehouseStock.ouarzazate || 0);
+    const totalStock = (warehouseStock.marrakech || 0) +
+      (warehouseStock.agadir || 0) +
+      (warehouseStock.ouarzazate || 0);
 
     const newProduct: Omit<Product, 'id'> = {
       sku: newProductData.sku || '',
@@ -321,8 +330,8 @@ export const Inventory = () => {
       });
       setWarehouseStock({});
       toast({
-        title: "Product Created",
-        description: `Product "${newProduct.name}" has been created successfully and added to Stock Tracking.`,
+        title: t('inventory.productCreated'),
+        description: t('inventory.productCreatedDescription', { name: newProduct.name }),
       });
     } catch (error) {
       console.error('Error creating product:', error);
@@ -345,15 +354,15 @@ export const Inventory = () => {
         await deleteProduct(deletingProduct.id);
         setDeletingProduct(null);
         toast({
-          title: "Product Deleted",
-          description: `Product "${productName}" has been deleted successfully.`,
+          title: t('inventory.productDeleted'),
+          description: t('inventory.productDeletedDescription', { name: productName }),
           variant: "destructive",
         });
       } catch (error) {
         console.error('Error deleting product:', error);
         toast({
-          title: "Error",
-          description: "Failed to delete product. Please try again.",
+          title: t('common.error'),
+          description: t('common.errorOccurred'),
           variant: "destructive",
         });
       }
@@ -365,38 +374,40 @@ export const Inventory = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Inventory</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">{t('inventory.title')}</h1>
           <p className="text-muted-foreground">
-            Manage products {isAllWarehouses ? 'across all warehouses' : `at ${warehouseInfo?.name}`}
+            {isAllWarehouses
+              ? t('inventory.manageProductsAcrossAll')
+              : t('inventory.manageProductsAt', { name: warehouseInfo?.name })}
           </p>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="gap-2">
-            <Download className="w-4 h-4" />
-            Export
+              <Button variant="outline" className="gap-2">
+                <Download className="w-4 h-4" />
+                {t('common.export')}
                 <ChevronDown className="w-3 h-3" />
-          </Button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => generateInventoryPDF(products)}>
                 <FileText className="w-4 h-4 mr-2" />
-                Export as PDF
+                {t('documents.exportAsPDF')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => generateInventoryExcel(products)}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export as Excel
+                {t('documents.exportAsExcel')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => generateInventoryCSV(products)}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export as CSV
+                {t('documents.exportAsCSV')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button className="gap-2 btn-primary-gradient" onClick={handleCreateProduct}>
             <Plus className="w-4 h-4" />
-            Add Product
+            {t('inventory.addProduct')}
           </Button>
         </div>
       </div>
@@ -407,7 +418,7 @@ export const Inventory = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name or SKU..."
+              placeholder={t('inventory.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -427,9 +438,9 @@ export const Inventory = () => {
                 <div className="px-3 py-2 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border">
                   Select Warehouse
                 </div>
-                
+
                 {/* All Warehouses Option */}
-                <SelectItem 
+                <SelectItem
                   value="all"
                   className={cn(
                     "cursor-pointer rounded-md px-3 py-2.5 my-0.5",
@@ -453,10 +464,10 @@ export const Inventory = () => {
                           "font-semibold text-sm leading-tight truncate",
                           isAllWarehouses ? "text-primary" : "text-foreground"
                         )}>
-                          All Warehouses
+                          {t('common.allWarehouses')}
                         </span>
                         <span className="text-xs text-muted-foreground truncate leading-tight mt-0.5">
-                          View all locations
+                          {t('common.viewAllLocations')}
                         </span>
                       </div>
                       {isAllWarehouses && (
@@ -470,8 +481,8 @@ export const Inventory = () => {
                 {warehouses.map((warehouse) => {
                   const isActive = warehouse.id === activeWarehouse;
                   return (
-                    <SelectItem 
-                      key={warehouse.id} 
+                    <SelectItem
+                      key={warehouse.id}
                       value={warehouse.id}
                       className={cn(
                         "cursor-pointer rounded-md px-3 py-2.5 my-0.5",
@@ -511,46 +522,46 @@ export const Inventory = () => {
                 })}
               </SelectContent>
             </Select>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder={t('inventory.category')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('inventory.allCategories')}</SelectItem>
                 {allCategories.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={ageFilter} onValueChange={(value) => setAgeFilter(value as 'all' | 'new' | 'old')}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Product Age" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Products</SelectItem>
-              <SelectItem value="new">New (Last 30 days)</SelectItem>
-              <SelectItem value="old">Old (30+ days)</SelectItem>
-            </SelectContent>
-          </Select>
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={ageFilter} onValueChange={(value) => setAgeFilter(value as 'all' | 'new' | 'old')}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder={t('inventory.productAge')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('inventory.allProducts')}</SelectItem>
+                <SelectItem value="new">{t('inventory.newProducts')}</SelectItem>
+                <SelectItem value="old">{t('inventory.oldProducts')}</SelectItem>
+              </SelectContent>
+            </Select>
             <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="w-[42px]" title="Add New Category">
+                <Button variant="outline" size="icon" className="w-[42px]" title={t('inventory.addCategory')}>
                   <FolderPlus className="w-4 h-4" />
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create New Category</DialogTitle>
+                  <DialogTitle>{t('inventory.createCategoryTitle')}</DialogTitle>
                   <DialogDescription>
-                    Add a new category to organize your products. Category names must be unique.
+                    {t('inventory.createCategoryDescription')}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="category-name">Category Name</Label>
+                    <Label htmlFor="category-name">{t('inventory.categoryName')}</Label>
                     <Input
                       id="category-name"
-                      placeholder="e.g., Machinery, Electronics..."
+                      placeholder={t('inventory.categoryPlaceholder')}
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
                       onKeyDown={(e) => {
@@ -561,7 +572,7 @@ export const Inventory = () => {
                       autoFocus
                     />
                     {newCategoryName.trim() && allCategories.includes(newCategoryName.trim()) && (
-                      <p className="text-sm text-destructive mt-1">This category already exists</p>
+                      <p className="text-sm text-destructive mt-1">{t('inventory.categoryExists')}</p>
                     )}
                   </div>
                 </div>
@@ -570,14 +581,14 @@ export const Inventory = () => {
                     setIsCategoryDialogOpen(false);
                     setNewCategoryName('');
                   }}>
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     onClick={handleCreateCategory}
                     disabled={!newCategoryName.trim() || allCategories.includes(newCategoryName.trim())}
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Create Category
+                    {t('common.create')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -585,84 +596,118 @@ export const Inventory = () => {
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder={t('common.status')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="in_stock">In Stock</SelectItem>
-              <SelectItem value="low_stock">Low Stock</SelectItem>
-              <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+              <SelectItem value="all">{t('inventory.allStatuses')}</SelectItem>
+              <SelectItem value="in_stock">{t('inventory.inStock')}</SelectItem>
+              <SelectItem value="low_stock">{t('inventory.lowStock')}</SelectItem>
+              <SelectItem value="out_of_stock">{t('inventory.outOfStock')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
       {/* Data Table */}
-      <div className="card-elevated overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="data-table-header hover:bg-section">
-              <TableHead className="w-[100px]">SKU</TableHead>
-              <TableHead>Product Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead className="text-center">Stock</TableHead>
-              <TableHead className="text-center">Min Stock</TableHead>
-              <TableHead className="text-right">Unit Price</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-center">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredProducts.map((product) => (
-              <TableRow key={product.id} className="hover:bg-section/50">
-                <TableCell className="font-mono text-sm max-w-[100px] truncate">{product.sku}</TableCell>
-                <TableCell className="font-medium max-w-[200px] truncate">{product.name}</TableCell>
-                <TableCell className="text-muted-foreground max-w-[120px] truncate">{product.category}</TableCell>
-                <TableCell className="text-center font-medium number-cell">
-                  {getProductStock(product.id)} {product.unit || 'Piece'}
-                </TableCell>
-                <TableCell className="text-center text-muted-foreground number-cell">
-                  {product.minStock} {product.unit || 'Piece'}
-                </TableCell>
-                <TableCell className="text-right font-medium number-cell">
-                  <CurrencyDisplay amount={product.price} />
-                </TableCell>
-                <TableCell className="text-center">{getStatusBadge(product.status)}</TableCell>
-                <TableCell className="w-[120px]">
-                  <div className="flex items-center justify-center gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8"
-                      onClick={() => handleViewProduct(product)}
-                      title="View product details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8"
-                      onClick={() => handleEditProduct(product)}
-                      title="Edit product"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteProduct(product)}
-                      title="Delete product"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+      <div className="bg-white dark:bg-card rounded-lg shadow-sm border border-border">
+        {filteredProducts.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            {t('common.noData')}
+          </div>
+        ) : (
+          <Accordion type="multiple" defaultValue={Array.from(new Set(filteredProducts.map(p => p.category)))} className="w-full">
+            {Object.entries(
+              filteredProducts.reduce((acc, product) => {
+                const category = product.category || "Uncategorized";
+                if (!acc[category]) acc[category] = [];
+                acc[category].push(product);
+                return acc;
+              }, {} as Record<string, typeof filteredProducts>)
+            ).map(([category, products]) => (
+              <AccordionItem key={category} value={category} className="border rounded-lg mb-4 overflow-hidden">
+                <AccordionTrigger className="hover:no-underline px-4 py-3 bg-muted/50 hover:bg-muted/70 transition-colors data-[state=open]:bg-primary/5 data-[state=open]:text-primary mb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-md bg-white dark:bg-card shadow-sm">
+                      {category === 'Uncategorized' ? <Package className="w-4 h-4" /> : <FolderPlus className="w-4 h-4" />}
+                    </div>
+                    <span className="font-semibold text-lg tracking-tight">{category}</span>
+                    <Badge variant="secondary" className="ml-2 font-mono">
+                      {products.length}
+                    </Badge>
                   </div>
-                </TableCell>
-              </TableRow>
+                </AccordionTrigger>
+                <AccordionContent className="px-0 pb-0">
+                  <div className="border-t">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[100px]">{t('inventory.sku')}</TableHead>
+                          <TableHead>{t('inventory.productName')}</TableHead>
+                          <TableHead>{t('inventory.category')}</TableHead>
+                          <TableHead className="text-center">{t('common.quantity')}</TableHead>
+                          <TableHead className="text-center">{t('inventory.minStock')}</TableHead>
+                          <TableHead className="text-right">{t('inventory.unitPrice')}</TableHead>
+                          <TableHead className="text-center">{t('common.status')}</TableHead>
+                          <TableHead className="text-center">{t('common.actions')}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {products.map((product) => (
+                          <TableRow key={product.id}>
+                            <TableCell className="font-mono text-sm max-w-[100px] truncate">{product.sku}</TableCell>
+                            <TableCell className="font-medium max-w-[200px] truncate">{product.name}</TableCell>
+                            <TableCell className="text-muted-foreground max-w-[120px] truncate">{product.category}</TableCell>
+                            <TableCell className="text-center font-medium number-cell">
+                              {getProductStock(product.id)} {t(`unit.${(product.unit || 'Piece').toLowerCase()}`)}
+                            </TableCell>
+                            <TableCell className="text-center text-muted-foreground number-cell">
+                              {product.minStock} {t(`unit.${(product.unit || 'Piece').toLowerCase()}`)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium number-cell">
+                              <CurrencyDisplay amount={product.price} />
+                            </TableCell>
+                            <TableCell className="text-center">{getStatusBadge(product.status)}</TableCell>
+                            <TableCell className="w-[120px]">
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleViewProduct(product)}
+                                  title={t('inventory.viewProduct')}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleEditProduct(product)}
+                                  title={t('inventory.editProduct')}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteProduct(product)}
+                                  title={t('inventory.deleteProduct')}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </TableBody>
-        </Table>
+          </Accordion>
+        )}
       </div>
 
       {/* Summary */}
@@ -679,7 +724,7 @@ export const Inventory = () => {
               }).length}
             </p>
             <p className="text-sm text-muted-foreground">
-              In Stock {!isAllWarehouses ? `(${warehouseInfo?.city})` : '(All)'}
+              {t('inventory.inStock')} {!isAllWarehouses ? `(${warehouseInfo?.city})` : `(${t('common.all')})`}
             </p>
           </div>
         </div>
@@ -695,7 +740,7 @@ export const Inventory = () => {
               }).length}
             </p>
             <p className="text-sm text-muted-foreground">
-              Low Stock {!isAllWarehouses ? `(${warehouseInfo?.city})` : '(All)'}
+              {t('inventory.lowStock')} {!isAllWarehouses ? `(${warehouseInfo?.city})` : `(${t('common.all')})`}
             </p>
           </div>
         </div>
@@ -708,7 +753,7 @@ export const Inventory = () => {
               {products.filter(p => getProductStock(p.id) === 0).length}
             </p>
             <p className="text-sm text-muted-foreground">
-              Out of Stock {!isAllWarehouses ? `(${warehouseInfo?.city})` : '(All)'}
+              {t('inventory.outOfStock')} {!isAllWarehouses ? `(${warehouseInfo?.city})` : `(${t('common.all')})`}
             </p>
           </div>
         </div>
@@ -720,18 +765,18 @@ export const Inventory = () => {
           {viewingProduct && (
             <>
               <DialogHeader>
-                <DialogTitle>Product Details</DialogTitle>
+                <DialogTitle>{t('inventory.productDetails')}</DialogTitle>
                 <DialogDescription>
-                  Complete information for {viewingProduct.name}
+                  {t('inventory.completeInformationFor', { name: viewingProduct.name })}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
                 {/* Product Image */}
                 {viewingProduct.image && (
                   <div className="flex justify-center">
-                    <img 
-                      src={viewingProduct.image} 
-                      alt={viewingProduct.name} 
+                    <img
+                      src={viewingProduct.image}
+                      alt={viewingProduct.name}
                       className="max-h-64 max-w-full rounded-lg object-contain border border-border"
                     />
                   </div>
@@ -757,33 +802,33 @@ export const Inventory = () => {
                 {/* Product Information Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-muted-foreground text-sm">Product ID</Label>
+                    <Label className="text-muted-foreground text-sm">{t('inventory.productId')}</Label>
                     <p className="font-medium font-mono text-sm mt-1">{viewingProduct.id}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-sm">SKU</Label>
+                    <Label className="text-muted-foreground text-sm">{t('inventory.sku')}</Label>
                     <p className="font-medium font-mono text-sm mt-1">{viewingProduct.sku}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-sm">Category</Label>
+                    <Label className="text-muted-foreground text-sm">{t('inventory.category')}</Label>
                     <p className="font-medium mt-1">{viewingProduct.category}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-sm">Unit</Label>
+                    <Label className="text-muted-foreground text-sm">{t('inventory.unit')}</Label>
                     <p className="font-medium mt-1">{viewingProduct.unit || 'Piece'}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-sm">Status</Label>
+                    <Label className="text-muted-foreground text-sm">{t('common.status')}</Label>
                     <div className="mt-1">{getStatusBadge(viewingProduct.status)}</div>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-sm">Unit Price</Label>
+                    <Label className="text-muted-foreground text-sm">{t('inventory.unitPrice')}</Label>
                     <p className="font-medium mt-1">
                       <CurrencyDisplay amount={viewingProduct.price} />
                     </p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-sm">Last Movement</Label>
+                    <Label className="text-muted-foreground text-sm">{t('inventory.lastMovement')}</Label>
                     <p className="font-medium mt-1">{viewingProduct.lastMovement}</p>
                   </div>
                 </div>
@@ -791,7 +836,7 @@ export const Inventory = () => {
                 {/* Product Description */}
                 {viewingProduct.description && (
                   <div className="border-t border-border pt-4">
-                    <Label className="text-muted-foreground text-sm">Description</Label>
+                    <Label className="text-muted-foreground text-sm">{t('common.description')}</Label>
                     <p className="font-medium mt-2 text-foreground whitespace-pre-wrap">
                       {viewingProduct.description}
                     </p>
@@ -800,25 +845,25 @@ export const Inventory = () => {
 
                 {/* Stock Information */}
                 <div className="border-t border-border pt-4">
-                  <h4 className="font-semibold text-foreground mb-3">Stock Information</h4>
+                  <h4 className="font-semibold text-foreground mb-3">{t('inventory.stockQuantity')}</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="card-elevated p-4">
                       <Label className="text-muted-foreground text-sm">
-                        Current Stock {isAllWarehouses ? '(Total)' : `(${warehouseInfo?.city})`}
+                        {t('inventory.inStock')} {isAllWarehouses ? `(${t('common.total')})` : `(${warehouseInfo?.city})`}
                       </Label>
                       <p className="text-2xl font-heading font-bold text-foreground mt-1">
                         {getProductStock(viewingProduct.id)} {viewingProduct.unit || 'Piece'}
                       </p>
                     </div>
                     <div className="card-elevated p-4">
-                      <Label className="text-muted-foreground text-sm">Minimum Stock</Label>
+                      <Label className="text-muted-foreground text-sm">{t('inventory.minStock')}</Label>
                       <p className="text-2xl font-heading font-bold text-warning mt-1">
                         {viewingProduct.minStock} {viewingProduct.unit || 'Piece'}
                       </p>
                     </div>
                     {!isAllWarehouses && (
                       <div className="col-span-2 space-y-2 mt-2">
-                        <Label className="text-muted-foreground text-sm">Stock by Warehouse</Label>
+                        <Label className="text-muted-foreground text-sm">{t('common.warehouse')}</Label>
                         <div className="grid grid-cols-3 gap-2 text-sm">
                           {warehouses.map((wh) => {
                             const stockItem = stockItems.find(si => si.id === viewingProduct.id);
@@ -847,7 +892,7 @@ export const Inventory = () => {
                   {getProductStock(viewingProduct.id) === 0 && (
                     <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
                       <p className="text-sm text-destructive font-medium">
-                        ⚠️ Product is out of stock {!isAllWarehouses ? `at ${warehouseInfo?.city}` : ''}
+                        ⚠️ {t('inventory.outOfStockAlert')} {!isAllWarehouses ? `${t('common.atWarehouse')} ${warehouseInfo?.city}` : ''}
                       </p>
                     </div>
                   )}
@@ -857,7 +902,7 @@ export const Inventory = () => {
                 <div className="border-t border-border pt-4">
                   <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg">
                     <Label className="text-muted-foreground">
-                      Total Inventory Value {!isAllWarehouses ? `(${warehouseInfo?.city})` : ''}
+                      {t('common.totalValue')} {!isAllWarehouses ? `(${warehouseInfo?.city})` : ''}
                     </Label>
                     <p className="text-xl font-heading font-bold text-primary">
                       <CurrencyDisplay amount={viewingProduct.price * getProductStock(viewingProduct.id)} />
@@ -867,14 +912,14 @@ export const Inventory = () => {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setViewingProduct(null)}>
-                  Close
+                  {t('common.close')}
                 </Button>
                 <Button className="btn-primary-gradient" onClick={() => {
                   handleEditProduct(viewingProduct);
                   setViewingProduct(null);
                 }}>
                   <Edit className="w-4 h-4 mr-2" />
-                  Edit Product
+                  {t('inventory.editProduct')}
                 </Button>
               </DialogFooter>
             </>
@@ -888,40 +933,40 @@ export const Inventory = () => {
           {editingProduct && (
             <>
               <DialogHeader>
-                <DialogTitle>Edit Product</DialogTitle>
+                <DialogTitle>{t('inventory.editProduct')}</DialogTitle>
                 <DialogDescription>
-                  Update product information for {editingProduct.name}
+                  {t('inventory.productUpdatedDescription', { name: editingProduct.name })}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-name">Product Name</Label>
+                    <Label htmlFor="edit-name">{t('inventory.productName')}</Label>
                     <Input
                       id="edit-name"
                       value={editFormData.name || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                      placeholder="Product name"
+                      placeholder={t('inventory.productName')}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-sku">SKU</Label>
+                    <Label htmlFor="edit-sku">{t('inventory.sku')}</Label>
                     <Input
                       id="edit-sku"
                       value={editFormData.sku || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, sku: e.target.value })}
-                      placeholder="SKU code"
+                      placeholder={t('inventory.sku')}
                       className="font-mono"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-category">Category *</Label>
+                    <Label htmlFor="edit-category">{t('inventory.category')} *</Label>
                     <Select
                       value={editFormData.category || ''}
                       onValueChange={(value) => setEditFormData({ ...editFormData, category: value })}
                     >
                       <SelectTrigger id="edit-category">
-                        <SelectValue placeholder="Select category" />
+                        <SelectValue placeholder={t('common.selectCategory')} />
                       </SelectTrigger>
                       <SelectContent>
                         {allCategories.map((cat) => (
@@ -931,13 +976,13 @@ export const Inventory = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-unit">Unit</Label>
+                    <Label htmlFor="edit-unit">{t('inventory.unit')}</Label>
                     <Select
                       value={editFormData.unit || 'Piece'}
                       onValueChange={(value) => setEditFormData({ ...editFormData, unit: value })}
                     >
                       <SelectTrigger id="edit-unit">
-                        <SelectValue placeholder="Select unit" />
+                        <SelectValue placeholder={t('inventory.unit')} />
                       </SelectTrigger>
                       <SelectContent>
                         {productUnits.map((unit) => (
@@ -947,12 +992,12 @@ export const Inventory = () => {
                     </Select>
                   </div>
                   <div className="space-y-2 col-span-2">
-                    <Label htmlFor="edit-description">Description</Label>
+                    <Label htmlFor="edit-description">{t('common.description')}</Label>
                     <Textarea
                       id="edit-description"
                       value={editFormData.description || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                      placeholder="Enter product description..."
+                      placeholder={t('common.description')}
                       rows={3}
                     />
                   </div>
@@ -963,9 +1008,9 @@ export const Inventory = () => {
                       {editFormData.image ? (
                         <div className="space-y-4">
                           <div className="relative inline-block">
-                            <img 
-                              src={editFormData.image} 
-                              alt="Product preview" 
+                            <img
+                              src={editFormData.image}
+                              alt="Product preview"
                               className="max-h-48 max-w-full rounded-lg mx-auto object-contain"
                             />
                           </div>
@@ -976,7 +1021,7 @@ export const Inventory = () => {
                               onClick={() => editImageInputRef.current?.click()}
                             >
                               <Upload className="w-4 h-4 mr-2" />
-                              Change Image
+                              {t('common.changeImage')}
                             </Button>
                             <Button
                               variant="outline"
@@ -984,7 +1029,7 @@ export const Inventory = () => {
                               onClick={() => handleRemoveImage(true)}
                             >
                               <X className="w-4 h-4 mr-2" />
-                              Remove
+                              {t('common.remove')}
                             </Button>
                           </div>
                         </div>
@@ -994,15 +1039,15 @@ export const Inventory = () => {
                             <Upload className="w-8 h-8 text-primary" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-foreground">Upload product image</p>
-                            <p className="text-xs text-muted-foreground mt-1">PNG, JPG, JPEG up to 5MB</p>
+                            <p className="text-sm font-medium text-foreground">{t('inventory.image')}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{t('common.imageSizeLimit', { size: `5 ${t('common.mb')}` })}</p>
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => editImageInputRef.current?.click()}
                           >
-                            Choose Image
+                            {t('common.select')}
                           </Button>
                         </div>
                       )}
@@ -1016,7 +1061,7 @@ export const Inventory = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-status">Status</Label>
+                    <Label htmlFor="edit-status">{t('common.status')}</Label>
                     <Select
                       value={editFormData.status || 'in_stock'}
                       onValueChange={(value) => setEditFormData({ ...editFormData, status: value as Product['status'] })}
@@ -1025,14 +1070,14 @@ export const Inventory = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="in_stock">In Stock</SelectItem>
-                        <SelectItem value="low_stock">Low Stock</SelectItem>
-                        <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                        <SelectItem value="in_stock">{t('inventory.inStock')}</SelectItem>
+                        <SelectItem value="low_stock">{t('inventory.lowStock')}</SelectItem>
+                        <SelectItem value="out_of_stock">{t('inventory.outOfStock')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-stock">Current Stock</Label>
+                    <Label htmlFor="edit-stock">{t('inventory.stockQuantity')}</Label>
                     <Input
                       id="edit-stock"
                       type="number"
@@ -1043,7 +1088,7 @@ export const Inventory = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-min-stock">Minimum Stock</Label>
+                    <Label htmlFor="edit-min-stock">{t('inventory.minStock')}</Label>
                     <Input
                       id="edit-min-stock"
                       type="number"
@@ -1054,7 +1099,7 @@ export const Inventory = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-price">Unit Price (DH)</Label>
+                    <Label htmlFor="edit-price">{t('inventory.unitPrice')} (DH)</Label>
                     <Input
                       id="edit-price"
                       type="number"
@@ -1066,7 +1111,7 @@ export const Inventory = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-last-movement">Last Movement</Label>
+                    <Label htmlFor="edit-last-movement">{t('inventory.lastMovement')}</Label>
                     <Input
                       id="edit-last-movement"
                       type="date"
@@ -1081,14 +1126,14 @@ export const Inventory = () => {
                   setEditingProduct(null);
                   setEditFormData({});
                 }}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
-                <Button 
-                  className="btn-primary-gradient" 
+                <Button
+                  className="btn-primary-gradient"
                   onClick={handleSaveProduct}
                   disabled={!editFormData.name || !editFormData.sku || !editFormData.category}
                 >
-                  Save Changes
+                  {t('common.saveChanges')}
                 </Button>
               </DialogFooter>
             </>
@@ -1100,43 +1145,43 @@ export const Inventory = () => {
       <Dialog open={isCreatingProduct} onOpenChange={setIsCreatingProduct}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create New Product</DialogTitle>
+            <DialogTitle>{t('inventory.addProduct')}</DialogTitle>
             <DialogDescription>
-              Add a new product to your inventory
+              {t('inventory.manageProductsAcrossAll')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="new-name">Product Name *</Label>
+                <Label htmlFor="new-name">{t('inventory.productName')} *</Label>
                 <Input
                   id="new-name"
                   value={newProductData.name || ''}
                   onChange={(e) => setNewProductData({ ...newProductData, name: e.target.value })}
-                  placeholder="Product name"
+                  placeholder={t('inventory.productName')}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-sku">SKU *</Label>
+                <Label htmlFor="new-sku">{t('inventory.sku')} *</Label>
                 <Input
                   id="new-sku"
                   value={newProductData.sku || ''}
                   onChange={(e) => setNewProductData({ ...newProductData, sku: e.target.value })}
-                  placeholder="SKU code"
+                  placeholder={t('inventory.sku')}
                   className="font-mono"
                 />
                 {newProductData.sku && products.some(p => p.sku === newProductData.sku) && (
-                  <p className="text-sm text-destructive mt-1">This SKU already exists</p>
+                  <p className="text-sm text-destructive mt-1">{t('inventory.skuExists')}</p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-category">Category *</Label>
+                <Label htmlFor="new-category">{t('inventory.category')} *</Label>
                 <Select
                   value={newProductData.category || ''}
                   onValueChange={(value) => setNewProductData({ ...newProductData, category: value })}
                 >
                   <SelectTrigger id="new-category">
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder={t('common.selectCategory')} />
                   </SelectTrigger>
                   <SelectContent>
                     {allCategories.map((cat) => (
@@ -1146,13 +1191,13 @@ export const Inventory = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-unit">Unit</Label>
+                <Label htmlFor="new-unit">{t('inventory.unit')}</Label>
                 <Select
                   value={newProductData.unit || 'Piece'}
                   onValueChange={(value) => setNewProductData({ ...newProductData, unit: value })}
                 >
                   <SelectTrigger id="new-unit">
-                    <SelectValue placeholder="Select unit" />
+                    <SelectValue placeholder={t('inventory.unit')} />
                   </SelectTrigger>
                   <SelectContent>
                     {productUnits.map((unit) => (
@@ -1162,25 +1207,25 @@ export const Inventory = () => {
                 </Select>
               </div>
               <div className="space-y-2 col-span-2">
-                <Label htmlFor="new-description">Description</Label>
+                <Label htmlFor="new-description">{t('common.description')}</Label>
                 <Textarea
                   id="new-description"
                   value={newProductData.description || ''}
                   onChange={(e) => setNewProductData({ ...newProductData, description: e.target.value })}
-                  placeholder="Enter product description..."
+                  placeholder={t('common.description')}
                   rows={3}
                 />
               </div>
               {/* Product Image Upload */}
               <div className="space-y-2 col-span-2">
-                <Label>Product Image</Label>
+                <Label>{t('inventory.image')}</Label>
                 <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
                   {newProductData.image ? (
                     <div className="space-y-4">
                       <div className="relative inline-block">
-                        <img 
-                          src={newProductData.image} 
-                          alt="Product preview" 
+                        <img
+                          src={newProductData.image}
+                          alt="Product preview"
                           className="max-h-48 max-w-full rounded-lg mx-auto object-contain"
                         />
                       </div>
@@ -1191,7 +1236,7 @@ export const Inventory = () => {
                           onClick={() => productImageInputRef.current?.click()}
                         >
                           <Upload className="w-4 h-4 mr-2" />
-                          Change Image
+                          {t('common.changeImage')}
                         </Button>
                         <Button
                           variant="outline"
@@ -1199,7 +1244,7 @@ export const Inventory = () => {
                           onClick={() => handleRemoveImage(false)}
                         >
                           <X className="w-4 h-4 mr-2" />
-                          Remove
+                          {t('common.remove')}
                         </Button>
                       </div>
                     </div>
@@ -1209,15 +1254,15 @@ export const Inventory = () => {
                         <Upload className="w-8 h-8 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">Upload product image</p>
-                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG, JPEG up to 5MB</p>
+                        <p className="text-sm font-medium text-foreground">{t('inventory.image')}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t('common.imageSizeLimit', { size: `5 ${t('common.mb')}` })}</p>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => productImageInputRef.current?.click()}
                       >
-                        Choose Image
+                        {t('common.select')}
                       </Button>
                     </div>
                   )}
@@ -1231,7 +1276,7 @@ export const Inventory = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-status">Status</Label>
+                <Label htmlFor="new-status">{t('common.status')}</Label>
                 <Select
                   value={newProductData.status || 'in_stock'}
                   onValueChange={(value) => setNewProductData({ ...newProductData, status: value as Product['status'] })}
@@ -1240,14 +1285,14 @@ export const Inventory = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="in_stock">In Stock</SelectItem>
-                    <SelectItem value="low_stock">Low Stock</SelectItem>
-                    <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                    <SelectItem value="in_stock">{t('inventory.inStock')}</SelectItem>
+                    <SelectItem value="low_stock">{t('inventory.lowStock')}</SelectItem>
+                    <SelectItem value="out_of_stock">{t('inventory.outOfStock')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-min-stock">Minimum Stock</Label>
+                <Label htmlFor="new-min-stock">{t('inventory.minStock')}</Label>
                 <Input
                   id="new-min-stock"
                   type="number"
@@ -1258,7 +1303,7 @@ export const Inventory = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-price">Unit Price (DH)</Label>
+                <Label htmlFor="new-price">{t('inventory.unitPrice')} (DH)</Label>
                 <Input
                   id="new-price"
                   type="number"
@@ -1270,7 +1315,7 @@ export const Inventory = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-last-movement">Last Movement</Label>
+                <Label htmlFor="new-last-movement">{t('inventory.lastMovement')}</Label>
                 <Input
                   id="new-last-movement"
                   type="date"
@@ -1283,9 +1328,9 @@ export const Inventory = () => {
             {/* Warehouse Stock Allocation Section */}
             <div className="col-span-2 space-y-4 pt-4 border-t border-border">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Warehouse Stock Allocation</Label>
+                <Label className="text-base font-semibold">{t('common.warehouse')}</Label>
                 <span className="text-sm text-muted-foreground">
-                  Total: {(warehouseStock.marrakech || 0) + (warehouseStock.agadir || 0) + (warehouseStock.ouarzazate || 0)}
+                  {t('common.total')}: {(warehouseStock.marrakech || 0) + (warehouseStock.agadir || 0) + (warehouseStock.ouarzazate || 0)}
                 </span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1350,7 +1395,7 @@ export const Inventory = () => {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                Allocate stock to specific warehouses. Total stock will be calculated automatically.
+                {t('inventory.warehouseAllocationHelp')}
               </p>
             </div>
           </div>
@@ -1372,15 +1417,15 @@ export const Inventory = () => {
               });
               setWarehouseStock({});
             }}>
-              Cancel
+              {t('common.cancel')}
             </Button>
-            <Button 
-              className="btn-primary-gradient" 
+            <Button
+              className="btn-primary-gradient"
               onClick={handleSaveNewProduct}
               disabled={!newProductData.name || !newProductData.sku || !newProductData.category || products.some(p => p.sku === newProductData.sku)}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Create Product
+              {t('common.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1390,19 +1435,18 @@ export const Inventory = () => {
       <AlertDialog open={!!deletingProduct} onOpenChange={(open) => !open && setDeletingProduct(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogTitle>{t('inventory.confirmDeleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deletingProduct?.name}</strong> (SKU: {deletingProduct?.sku})?
-              This action cannot be undone.
+              {t('inventory.confirmDeleteDescription', { name: deletingProduct?.name })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDeleteProduct}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

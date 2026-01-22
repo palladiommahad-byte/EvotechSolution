@@ -21,6 +21,7 @@ export interface Product {
   status?: 'in_stock' | 'low_stock' | 'out_of_stock';
   last_movement?: string;
   lastMovement?: string; // UI alias
+  is_deleted?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -56,6 +57,7 @@ export const productsService = {
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('is_deleted', false)
         .order('name', { ascending: true });
 
       if (error) {
@@ -86,6 +88,7 @@ export const productsService = {
         .from('products')
         .select('*')
         .eq('id', id)
+        .eq('is_deleted', false)
         .single();
 
       if (error) {
@@ -115,6 +118,7 @@ export const productsService = {
         .from('products')
         .select('*')
         .eq('sku', sku)
+        .eq('is_deleted', false)
         .single();
 
       if (error) {
@@ -157,6 +161,7 @@ export const productsService = {
         image: product.image,
         status: product.status || 'in_stock',
         last_movement: product.last_movement || new Date().toISOString().split('T')[0],
+        is_deleted: false,
       };
 
       // Calculate status based on stock vs min_stock
@@ -261,7 +266,7 @@ export const productsService = {
 
       const { error } = await supabase
         .from('products')
-        .delete()
+        .update({ is_deleted: true })
         .eq('id', id);
 
       if (error) {
@@ -389,6 +394,7 @@ export const productsService = {
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('is_deleted', false)
         .or(`name.ilike.%${query}%,sku.ilike.%${query}%`)
         .order('name', { ascending: true });
 
@@ -419,6 +425,7 @@ export const productsService = {
         .from('products')
         .select('*')
         .eq('category', category)
+        .eq('is_deleted', false)
         .order('name', { ascending: true });
 
       if (error) {
@@ -447,6 +454,7 @@ export const productsService = {
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('is_deleted', false)
         .not('min_stock', 'is', null)
         .filter('stock', 'lte', 'min_stock')
         .order('stock', { ascending: true });
