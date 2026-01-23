@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatMAD } from '@/lib/moroccan-utils';
+import { useTranslation } from 'react-i18next';
 
 const data = [
   { month: 'Jan', revenue: 245000 },
@@ -33,12 +34,13 @@ interface RevenueChartProps {
 }
 
 export const RevenueChart = ({ data: externalData }: RevenueChartProps) => {
+  const { t } = useTranslation();
   const displayData = externalData && externalData.length > 0 ? externalData : data;
   return (
     <div className="card-elevated p-6 animate-slide-up">
       <div className="mb-6 overflow-visible">
-        <h3 className="text-lg font-heading font-semibold text-foreground">Monthly Revenue</h3>
-        <p className="text-sm text-muted-foreground mt-1">Revenue trends over the past 12 months</p>
+        <h3 className="text-lg font-heading font-semibold text-foreground">{t('dashboard.revenueChart')}</h3>
+        <p className="text-sm text-muted-foreground mt-1">{t('dashboard.revenueTrends')}</p>
       </div>
       <div className="h-[250px] min-h-[200px]">
         <ResponsiveContainer width="100%" height="100%">
@@ -56,6 +58,7 @@ export const RevenueChart = ({ data: externalData }: RevenueChartProps) => {
               fontSize={12}
               tickLine={false}
               axisLine={false}
+              tickFormatter={(value) => String(t(`months.${value}`, value))}
             />
             <YAxis
               stroke="hsl(215, 16%, 47%)"
@@ -71,7 +74,7 @@ export const RevenueChart = ({ data: externalData }: RevenueChartProps) => {
                 borderRadius: '8px',
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.07)',
               }}
-              formatter={(value: number) => [formatMAD(value), 'Revenue']}
+              formatter={(value: number) => [formatMAD(value), t('dashboard.totalEarnings')]}
             />
             <Area
               type="monotone"

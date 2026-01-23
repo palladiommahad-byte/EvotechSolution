@@ -90,56 +90,88 @@ router.get('/stats', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /api/dashboard/sales-chart
+ * Get daily sales for current month
+ */
+router.get('/sales-chart', asyncHandler(async (req, res) => {
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+
+    const result = await query(
+        `SELECT TO_CHAR(date, 'DD') as label, COALESCE(SUM(total), 0) as value
+     FROM invoices 
+     WHERE status = 'paid' AND date >= $1
+     GROUP BY date
+     ORDER BY date`,
+        [startOfMonth]
+    );
+
+    res.json(result.rows);
+}));
+
+/**
  * GET /api/dashboard/revenue-chart
- * Get revenue data for chart
+ * Get monthly revenue and expenses for last 12 months
  */
 router.get('/revenue-chart', asyncHandler(async (req, res) => {
-    const { period = 'month' } = req.query;
+    const result = await query(
+        `WITH months AS (
+        SELECT generate_series(
+          date_trunc('month', current_date - interval '11 months'),
+          date_trunc('month', current_date),
+          interval '1 month'
+        )::date as month_date
+      ),
+      monthly_revenue AS (
+        SELECT date_trunc('month', date)::date as month_date, SUM(total) as revenue
+        FROM invoices WHERE status = 'paid'
+        GROUP BY 1
+      ),
+      monthly_expenses AS (
+        SELECT date_trunc('month', date)::date as month_date, SUM(total) as expenses
+        FROM purchase_invoices WHERE status = 'paid'
+        GROUP BY 1
+      )
+      SELECT 
+        TO_CHAR(m.month_date, 'Mon') as month,
+        COALESCE(r.revenue, 0) as revenue,
+        COALESCE(e.expenses, 0) as expenses
+      FROM months m
+      LEFT JOIN monthly_revenue r ON m.month_date = r.month_date
+      LEFT JOIN monthly_expenses e ON m.month_date = e.month_date
+      ORDER BY m.month_date`
+    );
 
-    let sql;
-    if (period === 'year') {
-        sql = `
-      SELECT DATE_TRUNC('month', date) as period, 
-             COALESCE(SUM(total), 0) as revenue
-      FROM invoices 
-      WHERE status = 'paid' AND date >= DATE_TRUNC('year', CURRENT_DATE)
-      GROUP BY DATE_TRUNC('month', date)
-      ORDER BY period
-    `;
-    } else {
-        sql = `
-      SELECT date as period, COALESCE(SUM(total), 0) as revenue
-      FROM invoices 
-      WHERE status = 'paid' AND date >= DATE_TRUNC('month', CURRENT_DATE)
-      GROUP BY date
-      ORDER BY date
-    `;
-    }
-
-    const result = await query(sql);
     res.json(result.rows);
 }));
 
 /**
  * GET /api/dashboard/top-products
- * Get top selling products
  */
 router.get('/top-products', asyncHandler(async (req, res) => {
-    const { limit = 10 } = req.query;
+    const limit = parseInt(req.query.limit) || 10;
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
     const result = await query(
-        `SELECT p.id, p.name, p.sku, SUM(ii.quantity) as quantity_sold, SUM(ii.total) as revenue
-     FROM invoice_items ii
-     JOIN products p ON ii.product_id = p.id
-     JOIN invoices i ON ii.invoice_id = i.id
-     WHERE i.status = 'paid' AND i.date >= DATE_TRUNC('month', CURRENT_DATE)
-     GROUP BY p.id, p.name, p.sku
-     ORDER BY quantity_sold DESC
-     LIMIT $1`,
-        [parseInt(limit)]
+        `SELECT p.id, p.name, p.sku, 
+             COALESCE(SUM(ii.quantity), 0) as quantity, 
+             COALESCE(SUM(ii.total), 0) as revenue
+      FROM products p
+      LEFT JOIN invoice_items ii ON p.id = ii.product_id
+      LEFT JOIN invoices i ON ii.invoice_id = i.id AND i.status = 'paid'
+      WHERE p.is_deleted = false
+      GROUP BY p.id, p.name, p.sku
+      ORDER BY quantity DESC
+      LIMIT $1`,
+        [limit]
     );
 
-    res.json(result.rows);
+    res.json(result.rows.map((r, i) => ({
+        ...r,
+        quantity: parseFloat(r.quantity),
+        revenue: parseFloat(r.revenue),
+        color: colors[i % colors.length]
+    })));
 }));
 
 /**
@@ -169,21 +201,42 @@ router.get('/recent-activity', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /api/dashboard/stock-by-category
+ */
+router.get('/stock-by-category', asyncHandler(async (req, res) => {
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    const result = await query(
+        `SELECT category, SUM(stock) as stock 
+     FROM products 
+     WHERE is_deleted = false AND category IS NOT NULL
+     GROUP BY category
+     ORDER BY stock DESC`
+    );
+
+    res.json(result.rows.map((r, i) => ({
+        ...r,
+        stock: parseInt(r.stock),
+        color: colors[i % colors.length]
+    })));
+}));
+
+/**
  * GET /api/dashboard/stock-alerts
  * Get stock alerts
  */
 router.get('/stock-alerts', asyncHandler(async (req, res) => {
     const result = await query(
-        `SELECT id, name, sku, stock, min_stock, status
+        `SELECT id, name, sku, stock, min_stock
      FROM products
-     WHERE is_deleted = false AND (status = 'low_stock' OR status = 'out_of_stock')
+     WHERE is_deleted = false AND stock <= min_stock
      ORDER BY stock ASC
-     LIMIT 20`
+     LIMIT 10`
     );
 
     res.json(result.rows.map(p => ({
         ...p,
-        minStock: p.min_stock,
+        stock: parseInt(p.stock),
+        min_stock: parseInt(p.min_stock)
     })));
 }));
 

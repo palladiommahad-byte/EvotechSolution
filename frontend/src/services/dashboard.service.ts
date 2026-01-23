@@ -5,27 +5,19 @@
 
 import { apiClient } from '@/lib/api-client';
 
-export interface DashboardStats {
-  revenue: { total: number; period: string };
-  expenses: { total: number; period: string };
-  profit: number;
-  pendingInvoices: { count: number; total: number };
-  overdueInvoices: { count: number; total: number };
-  products: { total: number; lowStock: number; outOfStock: number };
-  contacts: { clients: number; suppliers: number };
-}
-
-export interface RevenueChartData {
-  period: string;
-  revenue: number;
-}
-
 export interface TopProduct {
   id: string;
   name: string;
   sku: string;
-  quantity_sold: number;
+  quantity: number;
   revenue: number;
+  color: string;
+}
+
+export interface StockByCategory {
+  category: string;
+  stock: number;
+  color: string;
 }
 
 export interface RecentActivity {
@@ -43,17 +35,41 @@ export interface StockAlert {
   sku: string;
   stock: number;
   min_stock: number;
-  minStock?: number;
   status: string;
+}
+
+export interface DashboardData {
+  kpis: {
+    total_sales: number;
+    total_earnings: number;
+    total_orders: number;
+    total_stock_value: number;
+  };
+  comparisons: {
+    sales: { current: number; previous: number };
+    earnings: { current: number; previous: number };
+    orders: { current: number; previous: number };
+  };
+}
+
+export interface SalesChartItem {
+  label: string;
+  value: number;
+}
+
+export interface RevenueChartItem {
+  month: string;
+  revenue: number;
+  expenses: number;
 }
 
 export const dashboardService = {
   /**
-   * Get dashboard statistics
+   * Get dashboard statistics and comparisons
    */
-  async getStats(): Promise<DashboardStats | null> {
+  async getDashboardData(): Promise<DashboardData | null> {
     try {
-      return await apiClient.get<DashboardStats>('/dashboard/stats');
+      return await apiClient.get<DashboardData>('/dashboard/stats');
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       return null;
@@ -61,13 +77,37 @@ export const dashboardService = {
   },
 
   /**
+   * Get sales chart data
+   */
+  async getSalesChartData(): Promise<SalesChartItem[]> {
+    try {
+      return await apiClient.get<SalesChartItem[]>('/dashboard/sales-chart');
+    } catch (error) {
+      console.error('Error fetching sales chart data:', error);
+      return [];
+    }
+  },
+
+  /**
    * Get revenue chart data
    */
-  async getRevenueChart(period: 'month' | 'year' = 'month'): Promise<RevenueChartData[]> {
+  async getRevenueChartData(): Promise<RevenueChartItem[]> {
     try {
-      return await apiClient.get<RevenueChartData[]>(`/dashboard/revenue-chart?period=${period}`);
+      return await apiClient.get<RevenueChartItem[]>('/dashboard/revenue-chart');
     } catch (error) {
-      console.error('Error fetching revenue chart:', error);
+      console.error('Error fetching revenue chart data:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get stock by category distribution
+   */
+  async getStockByCategory(): Promise<StockByCategory[]> {
+    try {
+      return await apiClient.get<StockByCategory[]>('/dashboard/stock-by-category');
+    } catch (error) {
+      console.error('Error fetching stock by category:', error);
       return [];
     }
   },
@@ -85,6 +125,18 @@ export const dashboardService = {
   },
 
   /**
+   * Get stock alerts
+   */
+  async getLowStockAlerts(): Promise<StockAlert[]> {
+    try {
+      return await apiClient.get<StockAlert[]>('/dashboard/stock-alerts');
+    } catch (error) {
+      console.error('Error fetching stock alerts:', error);
+      return [];
+    }
+  },
+
+  /**
    * Get recent activity
    */
   async getRecentActivity(limit = 20): Promise<RecentActivity[]> {
@@ -92,18 +144,6 @@ export const dashboardService = {
       return await apiClient.get<RecentActivity[]>(`/dashboard/recent-activity?limit=${limit}`);
     } catch (error) {
       console.error('Error fetching recent activity:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Get stock alerts
-   */
-  async getStockAlerts(): Promise<StockAlert[]> {
-    try {
-      return await apiClient.get<StockAlert[]>('/dashboard/stock-alerts');
-    } catch (error) {
-      console.error('Error fetching stock alerts:', error);
       return [];
     }
   },

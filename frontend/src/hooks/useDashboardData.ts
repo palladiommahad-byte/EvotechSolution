@@ -7,49 +7,24 @@ import { useQuery } from '@tanstack/react-query';
 import { dashboardService } from '@/services/dashboard.service';
 
 export const useDashboardData = () => {
-  // Fetch KPIs
-  const { data: kpis, isLoading: kpisLoading } = useQuery({
-    queryKey: ['dashboard', 'kpis'],
-    queryFn: () => dashboardService.getKPIs(),
-    staleTime: 60000, // 1 minute
+  // Fetch Dashboard Stats (KPIs and Comparisons)
+  const { data: dashboardData, isLoading: statsLoading } = useQuery({
+    queryKey: ['dashboard', 'stats-comprehensive'],
+    queryFn: () => dashboardService.getDashboardData(),
+    staleTime: 60000,
   });
 
   // Fetch sales chart data
   const { data: salesChartData, isLoading: salesChartLoading } = useQuery({
     queryKey: ['dashboard', 'sales-chart'],
     queryFn: () => dashboardService.getSalesChartData(),
-    staleTime: 300000, // 5 minutes
+    staleTime: 300000,
   });
 
   // Fetch revenue chart data
   const { data: revenueChartData, isLoading: revenueChartLoading } = useQuery({
     queryKey: ['dashboard', 'revenue-chart'],
     queryFn: () => dashboardService.getRevenueChartData(),
-    staleTime: 300000, // 5 minutes
-  });
-
-  // Fetch comparisons
-  const { data: salesComparison, isLoading: salesComparisonLoading } = useQuery({
-    queryKey: ['dashboard', 'sales-comparison'],
-    queryFn: () => dashboardService.getSalesComparison(),
-    staleTime: 60000,
-  });
-
-  const { data: earningsComparison, isLoading: earningsComparisonLoading } = useQuery({
-    queryKey: ['dashboard', 'earnings-comparison'],
-    queryFn: () => dashboardService.getEarningsComparison(),
-    staleTime: 60000,
-  });
-
-  const { data: ordersComparison, isLoading: ordersComparisonLoading } = useQuery({
-    queryKey: ['dashboard', 'orders-comparison'],
-    queryFn: () => dashboardService.getOrdersComparison(),
-    staleTime: 60000,
-  });
-
-  const { data: stockValue, isLoading: stockValueLoading } = useQuery({
-    queryKey: ['dashboard', 'stock-value'],
-    queryFn: () => dashboardService.getStockValue(),
     staleTime: 300000,
   });
 
@@ -72,29 +47,24 @@ export const useDashboardData = () => {
   });
 
   return {
-    kpis: kpis || {
-      total_sales: '0',
-      total_earnings: '0',
-      total_orders: '0',
-      total_stock_value: '0',
+    kpis: dashboardData?.kpis || {
+      total_sales: 0,
+      total_earnings: 0,
+      total_orders: 0,
+      total_stock_value: 0,
     },
+    salesComparison: dashboardData?.comparisons?.sales || { current: 0, previous: 0 },
+    earningsComparison: dashboardData?.comparisons?.earnings || { current: 0, previous: 0 },
+    ordersComparison: dashboardData?.comparisons?.orders || { current: 0, previous: 0 },
     salesChartData: salesChartData || [],
     revenueChartData: revenueChartData || [],
-    salesComparison: salesComparison || { current: 0, previous: 0 },
-    earningsComparison: earningsComparison || { current: 0, previous: 0 },
-    ordersComparison: ordersComparison || { current: 0, previous: 0 },
-    stockValue: stockValue || 0,
     stockByCategory: stockByCategory || [],
     topProducts: topProducts || [],
     stockAlerts: stockAlerts || [],
     isLoading:
-      kpisLoading ||
+      statsLoading ||
       salesChartLoading ||
       revenueChartLoading ||
-      salesComparisonLoading ||
-      earningsComparisonLoading ||
-      ordersComparisonLoading ||
-      stockValueLoading ||
       stockByCategoryLoading ||
       topProductsLoading ||
       stockAlertsLoading,

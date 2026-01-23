@@ -22,7 +22,6 @@ export const Dashboard = () => {
     salesComparison,
     earningsComparison,
     ordersComparison,
-    stockValue,
     salesChartData,
     revenueChartData,
     stockByCategory,
@@ -62,55 +61,33 @@ export const Dashboard = () => {
       };
     }
 
-    const totalSales = parseFloat(kpis.total_sales || '0');
-    const totalEarnings = parseFloat(kpis.total_earnings || '0');
-    const totalOrders = parseInt(kpis.total_orders || '0');
-    const totalStockValueNum = typeof stockValue === 'number' ? stockValue : parseFloat(String(stockValue || '0'));
+    const totalSales = kpis.total_sales || 0;
+    const totalEarnings = kpis.total_earnings || 0;
+    const totalOrders = kpis.total_orders || 0;
+    const totalStockValueNum = kpis.total_stock_value || 0;
 
-    // Calculate percentage changes with type safety and missing data handling
-    const parseNumber = (val: any) => {
-      if (typeof val === "number") return val;
-      if (typeof val === "string") {
-        const n = parseFloat(val);
-        return isNaN(n) ? 0 : n;
-      }
-      return 0;
+    // Calculate percentage changes
+    const calcChange = (curr: number, prev: number) => {
+      if (prev <= 0) return 0;
+      return parseFloat(((curr - prev) / prev * 100).toFixed(1));
     };
-
-    const salesPrev = parseNumber(salesComparison?.previous);
-    const salesCurr = parseNumber(salesComparison?.current);
-    const salesChange = salesPrev > 0
-      ? ((salesCurr - salesPrev) / salesPrev * 100)
-      : 0;
-
-    const earningsPrev = parseNumber(earningsComparison?.previous);
-    const earningsCurr = parseNumber(earningsComparison?.current);
-    const earningsChange = earningsPrev > 0
-      ? ((earningsCurr - earningsPrev) / earningsPrev * 100)
-      : 0;
-
-    const ordersPrev = parseNumber(ordersComparison?.previous);
-    const ordersCurr = parseNumber(ordersComparison?.current);
-    const ordersChange = ordersPrev > 0
-      ? ((ordersCurr - ordersPrev) / ordersPrev * 100)
-      : 0;
 
     return {
       totalSales: {
         value: formatMAD(totalSales),
         numericValue: totalSales,
-        change: parseFloat(salesChange.toFixed(1)),
+        change: calcChange(salesComparison.current, salesComparison.previous),
         label: t('dashboard.vsLastMonth')
       },
       totalEarnings: {
         value: formatMAD(totalEarnings),
         numericValue: totalEarnings,
-        change: parseFloat(earningsChange.toFixed(1)),
+        change: calcChange(earningsComparison.current, earningsComparison.previous),
         label: t('dashboard.vsLastMonth')
       },
       totalOrders: {
         value: totalOrders.toString(),
-        change: parseFloat(ordersChange.toFixed(1)),
+        change: calcChange(ordersComparison.current, ordersComparison.previous),
         label: t('dashboard.newOrdersThisMonth')
       },
       totalStockValue: {
@@ -120,16 +97,16 @@ export const Dashboard = () => {
         label: t('dashboard.totalInventoryValue')
       }
     };
-  }, [kpis, salesComparison, earningsComparison, ordersComparison, stockValue, isLoading, t]);
+  }, [kpis, salesComparison, earningsComparison, ordersComparison, isLoading, t]);
 
   // Format chart data
   const formattedSalesData = useMemo(() => {
     if (!salesChartData || salesChartData.length === 0) return undefined;
 
     return salesChartData.map(item => ({
-      label: item.month, // Assumes item.month is like "Jan", "Feb" etc. from view
-      value: parseFloat(item.revenue),
-      originalDate: item.month
+      label: item.label,
+      value: item.value,
+      originalDate: item.label
     }));
   }, [salesChartData]);
 
@@ -138,8 +115,8 @@ export const Dashboard = () => {
 
     return revenueChartData.map(item => ({
       month: item.month,
-      revenue: parseFloat(item.revenue),
-      expenses: parseFloat(item.expenses)
+      revenue: item.revenue,
+      expenses: item.expenses
     }));
   }, [revenueChartData]);
 
@@ -214,8 +191,8 @@ export const Dashboard = () => {
               <ShoppingCart className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">Create Sale</p>
-              <p className="text-xs text-muted-foreground">New order</p>
+              <p className="text-sm font-medium text-foreground">{t('dashboard.createSale')}</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.newOrder')}</p>
             </div>
           </div>
         </div>
@@ -225,8 +202,8 @@ export const Dashboard = () => {
               <Package className="w-5 h-5 text-success" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">Add Product</p>
-              <p className="text-xs text-muted-foreground">Inventory</p>
+              <p className="text-sm font-medium text-foreground">{t('dashboard.addProduct')}</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.inventory')}</p>
             </div>
           </div>
         </div>
@@ -236,8 +213,8 @@ export const Dashboard = () => {
               <FileText className="w-5 h-5 text-info" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">New Invoice</p>
-              <p className="text-xs text-muted-foreground">Billing</p>
+              <p className="text-sm font-medium text-foreground">{t('dashboard.newInvoice')}</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.billing')}</p>
             </div>
           </div>
         </div>
@@ -247,8 +224,8 @@ export const Dashboard = () => {
               <AlertCircle className="w-5 h-5 text-warning" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">Low Stock</p>
-              <p className="text-xs text-muted-foreground">4 items</p>
+              <p className="text-sm font-medium text-foreground">{t('dashboard.lowStock')}</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.itemsCount', { count: stockAlerts.length })}</p>
             </div>
           </div>
         </div>

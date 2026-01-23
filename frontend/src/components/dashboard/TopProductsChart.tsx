@@ -9,6 +9,7 @@ import {
 import { ToggleButtonGroup } from '@/components/ui/ToggleButtonGroup';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { TopProduct } from '@/services/dashboard.service';
+import { useTranslation } from 'react-i18next';
 
 interface TopProductsChartProps {
   data?: TopProduct[];
@@ -17,6 +18,7 @@ interface TopProductsChartProps {
 type ViewMode = 'quantity' | 'revenue';
 
 export const TopProductsChart = ({ data: productData = [] }: TopProductsChartProps) => {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('quantity');
 
   const dataKey = viewMode === 'quantity' ? 'quantity' : 'revenue';
@@ -26,14 +28,16 @@ export const TopProductsChart = ({ data: productData = [] }: TopProductsChartPro
     <div className="card-elevated p-6 animate-slide-up flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
         <div className="min-w-0 overflow-visible">
-          <h3 className="text-lg font-heading font-semibold text-foreground">Top Sold Products</h3>
-          <p className="text-xl sm:text-2xl font-bold text-foreground mt-1 break-words overflow-visible whitespace-normal leading-tight">{productData.length} Products</p>
-          <p className="text-sm text-muted-foreground">By Sales Volume</p>
+          <h3 className="text-lg font-heading font-semibold text-foreground">{t('dashboard.topSoldProducts')}</h3>
+          <p className="text-xl sm:text-2xl font-bold text-foreground mt-1 break-words overflow-visible whitespace-normal leading-tight">
+            {productData.length} {t('dashboard.products')}
+          </p>
+          <p className="text-sm text-muted-foreground">{t('dashboard.bySalesVolume')}</p>
         </div>
         <ToggleButtonGroup
           options={[
-            { value: 'quantity' as const, label: 'By Quantity' },
-            { value: 'revenue' as const, label: 'By Revenue' },
+            { value: 'quantity' as const, label: t('dashboard.byQuantity') },
+            { value: 'revenue' as const, label: t('dashboard.byRevenue') },
           ]}
           value={viewMode}
           onChange={(val) => setViewMode(val as ViewMode)}
@@ -44,13 +48,13 @@ export const TopProductsChart = ({ data: productData = [] }: TopProductsChartPro
       <div className="flex items-center justify-between mb-4">
         <button className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
-          <span className="hidden sm:inline">Previous</span>
+          <span className="hidden sm:inline">{t('common.previous')}</span>
         </button>
         <span className="text-xs sm:text-sm text-muted-foreground font-medium text-center px-2">
-          Top by {viewMode === 'quantity' ? 'Quantity' : 'Revenue'}: Current Month
+          {viewMode === 'quantity' ? t('dashboard.byQuantity') : t('dashboard.byRevenue')}: {t('dashboard.currentMonth')}
         </span>
         <button className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <span className="hidden sm:inline">Next</span>
+          <span className="hidden sm:inline">{t('common.next')}</span>
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
@@ -81,7 +85,7 @@ export const TopProductsChart = ({ data: productData = [] }: TopProductsChartPro
                 }}
                 formatter={(value: number) => [
                   viewMode === 'revenue' ? `${(value / 1000).toFixed(1)}K MAD` : value,
-                  viewMode === 'revenue' ? 'Revenue' : 'Quantity'
+                  viewMode === 'revenue' ? t('dashboard.byRevenue') : t('dashboard.byQuantity')
                 ]}
               />
             </PieChart>
@@ -105,3 +109,4 @@ export const TopProductsChart = ({ data: productData = [] }: TopProductsChartPro
     </div>
   );
 };
+
