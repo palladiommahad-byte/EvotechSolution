@@ -693,7 +693,7 @@ export const Settings = () => {
     setIsWarehouseDialogOpen(true);
   };
 
-  const handleSaveWarehouse = () => {
+  const handleSaveWarehouse = async () => {
     if (!warehouseForm.name || !warehouseForm.city) {
       toast({
         title: "Validation Error",
