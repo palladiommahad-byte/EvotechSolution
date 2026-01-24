@@ -263,7 +263,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         // Still show success for purchase order creation
       }
 
-      toast({ title: 'Purchase order created successfully' });
+      toast({ title: 'Purchase order created successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       // Check if it's a duplicate key error
@@ -328,7 +328,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_orders'] });
-      toast({ title: 'Purchase order updated successfully' });
+      toast({ title: 'Purchase order updated successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error updating purchase order', description: error.message, variant: 'destructive' });
@@ -357,7 +357,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_orders'] });
-      toast({ title: 'Purchase order deleted successfully' });
+      toast({ title: 'Purchase order deleted successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error deleting purchase order', description: error.message, variant: 'destructive' });
@@ -441,7 +441,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
         // Still show success for purchase invoice creation
       }
 
-      toast({ title: 'Purchase invoice created successfully' });
+      toast({ title: 'Purchase invoice created successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       // Check if it's a duplicate key error
@@ -522,7 +522,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_invoices'] });
-      toast({ title: 'Purchase invoice updated successfully' });
+      toast({ title: 'Purchase invoice updated successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error updating purchase invoice', description: error.message, variant: 'destructive' });
@@ -551,7 +551,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'purchase_invoices'] });
-      toast({ title: 'Purchase invoice deleted successfully' });
+      toast({ title: 'Purchase invoice deleted successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error deleting purchase invoice', description: error.message, variant: 'destructive' });
@@ -582,7 +582,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'delivery_notes'] });
-      toast({ title: 'Delivery note created successfully' });
+      toast({ title: 'Delivery note created successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error creating delivery note', description: error.message, variant: 'destructive' });
@@ -609,7 +609,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'delivery_notes'] });
-      toast({ title: 'Delivery note updated successfully' });
+      toast({ title: 'Delivery note updated successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error updating delivery note', description: error.message, variant: 'destructive' });
@@ -626,7 +626,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'delivery_notes'] });
-      toast({ title: 'Delivery note deleted successfully' });
+      toast({ title: 'Delivery note deleted successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error deleting delivery note', description: error.message, variant: 'destructive' });

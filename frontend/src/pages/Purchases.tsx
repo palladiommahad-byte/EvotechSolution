@@ -300,6 +300,11 @@ export const Purchases = () => {
       status: doc.status,
       paymentMethod: doc.paymentMethod,
     });
+    toast({
+      title: "Document Loaded",
+      description: "Document details loaded for editing.",
+      variant: "success",
+    });
   };
 
   const handleSaveDocument = async () => {

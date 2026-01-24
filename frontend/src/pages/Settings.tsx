@@ -311,6 +311,7 @@ export const Settings = () => {
     toast({
       title: "Success",
       description: "Company information saved successfully.",
+      variant: "success",
     });
   };
 
@@ -348,6 +349,7 @@ export const Settings = () => {
     toast({
       title: "Success",
       description: "Branding settings saved successfully.",
+      variant: "success",
     });
   };
 
@@ -382,6 +384,7 @@ export const Settings = () => {
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
+        variant: "success",
       });
 
       setProfileForm(prev => ({
@@ -438,6 +441,7 @@ export const Settings = () => {
       toast({
         title: "Status Updated",
         description: `${user?.name}'s status changed to ${newStatus}. ${newStatus === 'inactive' ? 'User will be logged out if currently active.' : ''}`,
+        variant: "success",
       });
     } catch (error) {
       toast({
@@ -486,6 +490,7 @@ export const Settings = () => {
       toast({
         title: "User Deleted",
         description: `${safeString(user.name)} has been removed from the team.`,
+        variant: "success",
       });
     } catch (error) {
       toast({
@@ -611,6 +616,7 @@ export const Settings = () => {
           toast({
             title: "Admin Updated",
             description: "Admin information has been updated successfully. New credentials are active immediately.",
+            variant: "success",
           });
         } else {
           await updateUserMutation.mutateAsync({
@@ -632,6 +638,7 @@ export const Settings = () => {
           toast({
             title: "User Updated",
             description: `${userForm.name} has been updated successfully. New credentials are active immediately.`,
+            variant: "success",
           });
         }
       } else {
@@ -647,6 +654,7 @@ export const Settings = () => {
         toast({
           title: "User Added",
           description: `${userForm.name} has been added to the team successfully. Login credentials have been set.`,
+          variant: "success",
         });
       }
 
@@ -708,12 +716,14 @@ export const Settings = () => {
       toast({
         title: "Warehouse Updated",
         description: `${safeString(warehouseForm.name)} has been updated successfully.`,
+        variant: "success",
       });
     } else {
       const newWarehouse = await addWarehouse(warehouseForm);
       toast({
         title: "Warehouse Created",
         description: `${safeString(warehouseForm.name)} has been added successfully.`,
+        variant: "success",
       });
       // Set as active warehouse if it's the first one
       if (!warehouses || warehouses.length === 0) {
@@ -749,7 +759,8 @@ export const Settings = () => {
       setWarehouseToDelete(null);
       toast({
         title: "Warehouse Deleted",
-        description: `${safeString(warehouse.name)} has been removed.`,
+        description: `${safeString(warehouseForm.name)} has been removed.`,
+        variant: "success",
       });
     }
   };
@@ -1639,6 +1650,7 @@ export const Settings = () => {
                           toast({
                             title: "All marked as read",
                             description: "All notifications have been marked as read.",
+                            variant: "success",
                           });
                         }}
                       >
@@ -1655,6 +1667,7 @@ export const Settings = () => {
                         toast({
                           title: "Notifications cleared",
                           description: "All notifications have been removed.",
+                          variant: "success",
                         });
                       }}
                     >
@@ -1872,6 +1885,7 @@ export const Settings = () => {
                                   toast({
                                     title: "Marked as read",
                                     description: "Notification has been marked as read.",
+                                    variant: "success",
                                   });
                                 }}
                               >

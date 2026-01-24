@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Package, TrendingUp, DollarSign, ShoppingCart, AlertCircle, FileText } from 'lucide-react';
+import { Package, TrendingUp, DollarSign, ShoppingCart } from 'lucide-react';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { SalesChart } from '@/components/dashboard/SalesChart';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
@@ -183,53 +183,6 @@ export const Dashboard = () => {
         <InventoryStatsCard />
       </div>
 
-      {/* Quick Actions - Optional enhancement */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card-elevated p-4 hover:shadow-md transition-shadow cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-              <ShoppingCart className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">{t('dashboard.createSale')}</p>
-              <p className="text-xs text-muted-foreground">{t('dashboard.newOrder')}</p>
-            </div>
-          </div>
-        </div>
-        <div className="card-elevated p-4 hover:shadow-md transition-shadow cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-success/10 group-hover:bg-success/20 transition-colors">
-              <Package className="w-5 h-5 text-success" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">{t('dashboard.addProduct')}</p>
-              <p className="text-xs text-muted-foreground">{t('dashboard.inventory')}</p>
-            </div>
-          </div>
-        </div>
-        <div className="card-elevated p-4 hover:shadow-md transition-shadow cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-info/10 group-hover:bg-info/20 transition-colors">
-              <FileText className="w-5 h-5 text-info" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">{t('dashboard.newInvoice')}</p>
-              <p className="text-xs text-muted-foreground">{t('dashboard.billing')}</p>
-            </div>
-          </div>
-        </div>
-        <div className="card-elevated p-4 hover:shadow-md transition-shadow cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-warning/10 group-hover:bg-warning/20 transition-colors">
-              <AlertCircle className="w-5 h-5 text-warning" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">{t('dashboard.lowStock')}</p>
-              <p className="text-xs text-muted-foreground">{t('dashboard.itemsCount', { count: stockAlerts.length })}</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

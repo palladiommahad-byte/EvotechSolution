@@ -400,7 +400,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
         // Still show success for invoice creation
       }
 
-      toast({ title: 'Invoice created successfully' });
+      toast({ title: 'Invoice created successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       // Check if it's a duplicate key error
@@ -504,7 +504,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales', 'invoices'] });
-      toast({ title: 'Invoice updated successfully' });
+      toast({ title: 'Invoice updated successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error updating invoice', description: error.message, variant: 'destructive' });
@@ -533,7 +533,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales', 'invoices'] });
-      toast({ title: 'Invoice deleted successfully' });
+      toast({ title: 'Invoice deleted successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error deleting invoice', description: error.message, variant: 'destructive' });
@@ -574,7 +574,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales', 'estimates'] });
-      toast({ title: 'Estimate created successfully' });
+      toast({ title: 'Estimate created successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       if (error.message.includes('duplicate key') || error.message.includes('document_id_key')) {
@@ -611,7 +611,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales', 'estimates'] });
-      toast({ title: 'Estimate updated successfully' });
+      toast({ title: 'Estimate updated successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error updating estimate', description: error.message, variant: 'destructive' });
@@ -628,7 +628,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales', 'estimates'] });
-      toast({ title: 'Estimate deleted successfully' });
+      toast({ title: 'Estimate deleted successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error deleting estimate', description: error.message, variant: 'destructive' });
@@ -674,7 +674,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       // Invalidate products and stock items to reflect stock changes
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stockItems'] });
-      toast({ title: 'Delivery note created successfully' });
+      toast({ title: 'Delivery note created successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       if (error.message.includes('duplicate key') || error.message.includes('document_id_key')) {
@@ -714,7 +714,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       // Invalidate products and stock items to reflect stock changes
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stockItems'] });
-      toast({ title: 'Delivery note updated successfully' });
+      toast({ title: 'Delivery note updated successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error updating delivery note', description: error.message, variant: 'destructive' });
@@ -734,7 +734,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       // Invalidate products and stock items to reflect stock changes
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stockItems'] });
-      toast({ title: 'Delivery note deleted successfully' });
+      toast({ title: 'Delivery note deleted successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error deleting delivery note', description: error.message, variant: 'destructive' });
@@ -780,7 +780,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       // Invalidate products and stock items to reflect stock changes
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stockItems'] });
-      toast({ title: 'Divers document created successfully' });
+      toast({ title: 'Divers document created successfully', variant: 'success' });
     },
     onError: (error: Error) => {
       if (error.message.includes('duplicate key') || error.message.includes('document_id_key')) {

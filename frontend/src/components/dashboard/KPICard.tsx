@@ -34,30 +34,30 @@ export const KPICard = ({
         <div className={cn("p-3 rounded-xl flex-shrink-0", iconBg)}>
           {icon}
         </div>
-        <div className="text-right flex-shrink-0 min-w-0">
+        <div className="text-right flex-1 min-w-0 overflow-visible">
           {change !== undefined && change !== 0 && (
             <div className="flex flex-col items-end gap-0.5">
               <div className="flex items-center gap-1 text-xs">
                 {isPositive && <TrendingUp className="w-3 h-3 text-success flex-shrink-0" />}
                 {isNegative && <TrendingDown className="w-3 h-3 text-destructive flex-shrink-0" />}
-              <span
-                className={cn(
-                    "font-medium whitespace-nowrap",
-                  isPositive && "text-success",
-                  isNegative && "text-destructive"
-                )}
-              >
-                {isPositive && '+'}
-                {change}%
-              </span>
+                <span
+                  className={cn(
+                    "font-medium",
+                    isPositive && "text-success",
+                    isNegative && "text-destructive"
+                  )}
+                >
+                  {isPositive && '+'}
+                  {change}%
+                </span>
               </div>
               {changeLabel && (
-                <span className="text-xs text-muted-foreground whitespace-nowrap text-right">{changeLabel}</span>
+                <span className="text-xs text-muted-foreground whitespace-normal text-right">{changeLabel}</span>
               )}
             </div>
           )}
           {change === 0 && changeLabel && (
-            <span className="text-xs text-muted-foreground whitespace-nowrap">{changeLabel}</span>
+            <span className="text-xs text-muted-foreground whitespace-normal">{changeLabel}</span>
           )}
         </div>
       </div>

@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Wallet, 
-  Building2, 
-  Coins, 
-  Plus, 
-  TrendingUp, 
+import {
+  Wallet,
+  Building2,
+  Coins,
+  Plus,
+  TrendingUp,
   TrendingDown,
   Calendar,
   CreditCard,
@@ -134,7 +134,7 @@ export const Treasury = () => {
   const [isAddBankOpen, setIsAddBankOpen] = useState(false);
   const [viewingPayment, setViewingPayment] = useState<Payment | null>(null);
   const [dateFilterRange, setDateFilterRange] = useState<string>('all');
-  
+
   // Fetch invoices for aging receivables calculation
   const { data: invoicesData = [] } = useQuery({
     queryKey: ['invoices', 'aging'],
@@ -186,16 +186,16 @@ export const Treasury = () => {
   // Date filter helper function (reusable)
   const matchesDateFilter = (date: string): boolean => {
     if (dateFilterRange === 'all') return true;
-    
+
     const paymentDate = new Date(date);
     paymentDate.setHours(0, 0, 0, 0);
-    
+
     const now = new Date();
     now.setHours(23, 59, 59, 999);
-    
+
     let startDate: Date | null = null;
     let endDate: Date = now;
-    
+
     switch (dateFilterRange) {
       case 'today':
         startDate = new Date(now);
@@ -239,11 +239,11 @@ export const Treasury = () => {
       default:
         return true;
     }
-    
+
     if (startDate) {
       return paymentDate >= startDate && paymentDate <= endDate;
     }
-    
+
     return true;
   };
 
@@ -251,7 +251,7 @@ export const Treasury = () => {
   // These are calculated in TreasuryContext, but we need to apply date filter here
   const filteredExpectedInflowPayments = expectedInflowPayments.filter(p => matchesDateFilter(p.date));
   const filteredTotalExpectedInflow = filteredExpectedInflowPayments.reduce((sum, p) => sum + p.amount, 0);
-  
+
   const filteredUpcomingPayments = upcomingPayments.filter(p => matchesDateFilter(p.date));
   const filteredTotalUpcomingPayments = filteredUpcomingPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -270,16 +270,16 @@ export const Treasury = () => {
     // Validate that the invoice exists by checking document_id (invoice_number)
     const invoiceExists = payment.invoiceNumber ? existingInvoiceDocumentIds.has(payment.invoiceNumber) : false;
     if (!invoiceExists) return false;
-    
-    const matchesSearch = 
+
+    const matchesSearch =
       payment.invoiceNumber.toLowerCase().includes(salesSearchQuery.toLowerCase()) ||
       payment.entity.toLowerCase().includes(salesSearchQuery.toLowerCase()) ||
       (payment.checkNumber && payment.checkNumber.toLowerCase().includes(salesSearchQuery.toLowerCase()));
-    
+
     const matchesStatus = salesStatusFilter === 'all' || payment.status === salesStatusFilter;
     const matchesMethod = salesPaymentMethodFilter === 'all' || payment.paymentMethod === salesPaymentMethodFilter;
     const matchesDate = matchesDateFilter(payment.date);
-    
+
     return matchesSearch && matchesStatus && matchesMethod && matchesDate;
   });
 
@@ -295,20 +295,20 @@ export const Treasury = () => {
 
   const filteredPurchasePayments = purchasePayments.filter(payment => {
     // Validate that the purchase document exists by checking document_id (invoice_number)
-    const documentExists = payment.invoiceNumber ? 
-      (existingPurchaseOrderDocumentIds.has(payment.invoiceNumber) || existingPurchaseInvoiceDocumentIds.has(payment.invoiceNumber)) : 
+    const documentExists = payment.invoiceNumber ?
+      (existingPurchaseOrderDocumentIds.has(payment.invoiceNumber) || existingPurchaseInvoiceDocumentIds.has(payment.invoiceNumber)) :
       false;
     if (!documentExists) return false;
-    
-    const matchesSearch = 
+
+    const matchesSearch =
       payment.invoiceNumber.toLowerCase().includes(purchaseSearchQuery.toLowerCase()) ||
       payment.entity.toLowerCase().includes(purchaseSearchQuery.toLowerCase()) ||
       (payment.checkNumber && payment.checkNumber.toLowerCase().includes(purchaseSearchQuery.toLowerCase()));
-    
+
     const matchesStatus = purchaseStatusFilter === 'all' || payment.status === purchaseStatusFilter;
     const matchesMethod = purchasePaymentMethodFilter === 'all' || payment.paymentMethod === purchasePaymentMethodFilter;
     const matchesDate = matchesDateFilter(payment.date);
-    
+
     return matchesSearch && matchesStatus && matchesMethod && matchesDate;
   });
 
@@ -316,16 +316,16 @@ export const Treasury = () => {
   const calculateAging = () => {
     const now = new Date();
     const buckets = { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
-    
+
     // Filter unpaid invoices (sent or overdue status)
-    const unpaidInvoices = invoicesData.filter(inv => 
+    const unpaidInvoices = invoicesData.filter(inv =>
       inv.status === 'sent' || inv.status === 'overdue'
     );
-    
+
     unpaidInvoices.forEach(invoice => {
       const invoiceDate = new Date(invoice.date);
       const daysDiff = Math.floor((now.getTime() - invoiceDate.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (daysDiff <= 30) buckets['0-30'] += invoice.total;
       else if (daysDiff <= 60) buckets['31-60'] += invoice.total;
       else if (daysDiff <= 90) buckets['61-90'] += invoice.total;
@@ -346,23 +346,23 @@ export const Treasury = () => {
   const generateCashFlowData = (): CashFlowData[] => {
     const now = new Date();
     const months: CashFlowData[] = [];
-    
+
     // Generate last 6 months
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      
+
       // Calculate cash in (sales payments that are cleared)
       const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
-      
+
       const cashIn = salesPayments
         .filter(p => {
           const paymentDate = new Date(p.date);
           return paymentDate >= monthStart && paymentDate <= monthEnd && p.status === 'cleared';
         })
         .reduce((sum, p) => sum + p.amount, 0);
-      
+
       // Calculate cash out (purchase payments that are cleared)
       const cashOut = purchasePayments
         .filter(p => {
@@ -370,14 +370,14 @@ export const Treasury = () => {
           return paymentDate >= monthStart && paymentDate <= monthEnd && p.status === 'cleared';
         })
         .reduce((sum, p) => sum + p.amount, 0);
-      
+
       months.push({
         month: monthName,
         cashIn,
         cashOut,
       });
     }
-    
+
     return months;
   };
 
@@ -431,20 +431,21 @@ export const Treasury = () => {
     try {
       await addPayment(newPayment, paymentType);
 
-    // Reset form
-    setFormInvoiceId('');
-    setFormClient('');
-    setFormAmount('');
-    setFormBank('');
-    setFormCheckNumber('');
-    setFormMaturityDate('');
-    setFormWarehouse('');
-    setFormNotes('');
-    setIsAddPaymentOpen(false);
+      // Reset form
+      setFormInvoiceId('');
+      setFormClient('');
+      setFormAmount('');
+      setFormBank('');
+      setFormCheckNumber('');
+      setFormMaturityDate('');
+      setFormWarehouse('');
+      setFormNotes('');
+      setIsAddPaymentOpen(false);
 
       toast({
         title: "Payment Recorded",
         description: `${paymentType === 'sales' ? 'Sales' : 'Purchase'} payment of ${formatMAD(parseFloat(formAmount))} has been recorded successfully.`,
+        variant: "success",
       });
     } catch (error) {
       console.error('Error adding payment:', error);
@@ -459,7 +460,7 @@ export const Treasury = () => {
   // Handle Add Bank Account
   const handleAddBankAccount = async () => {
     const bankNameFinal = formBankName === 'Other' ? formCustomBankName : formBankName;
-    
+
     if (!bankNameFinal || !formBankAccountName || !formAccountNumber) {
       toast({
         title: "Validation Error",
@@ -501,6 +502,7 @@ export const Treasury = () => {
       toast({
         title: "Bank Account Added",
         description: `${formBankAccountName} account has been added successfully.`,
+        variant: "success",
       });
     } catch (error) {
       console.error('Error adding bank account:', error);
@@ -516,10 +518,11 @@ export const Treasury = () => {
   const markInvoiceAsPaid = async (invoiceId: string) => {
     try {
       await invoicesService.updateStatus(invoiceId, 'paid');
-      
+
       toast({
         title: "Invoice Marked as Paid",
         description: `Invoice ${invoiceId} has been marked as paid.`,
+        variant: "success",
       });
     } catch (error) {
       console.error('Error marking invoice as paid:', error);
@@ -548,6 +551,7 @@ export const Treasury = () => {
       toast({
         title: "Status Updated",
         description: `Payment status updated to ${newStatus === 'in-hand' ? 'In-Hand' : newStatus === 'pending_bank' ? 'Pending Bank' : 'Cleared'}.`,
+        variant: "success",
       });
     } catch (error) {
       console.error('Error updating payment status:', error);
@@ -1001,14 +1005,14 @@ export const Treasury = () => {
               <Legend />
               <Bar dataKey="amount" name="Unpaid Amount (MAD)" fill="#1e293b">
                 {agingData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
+                  <Cell
+                    key={`cell-${index}`}
                     fill={
-                      index === 0 ? '#10b981' : 
-                      index === 1 ? '#f59e0b' : 
-                      index === 2 ? '#f97316' : 
-                      '#ef4444'
-                    } 
+                      index === 0 ? '#10b981' :
+                        index === 1 ? '#f59e0b' :
+                          index === 2 ? '#f97316' :
+                            '#ef4444'
+                    }
                   />
                 ))}
               </Bar>
@@ -1054,8 +1058,8 @@ export const Treasury = () => {
                         {entry.description}
                       </TableCell>
                       <TableCell className="px-2 py-2 whitespace-nowrap">
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className={`text-xs ${entry.transactionType === 'credit' ? 'bg-success/10 text-success border-success/20' : 'bg-red-50 text-red-600 border-red-200'}`}
                         >
                           {entry.transactionType === 'credit' ? 'Credit' : 'Debit'}
@@ -1121,7 +1125,7 @@ export const Treasury = () => {
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {netTVADue >= 0 
+              {netTVADue >= 0
                 ? 'Amount to pay to DGI (Direction Générale des Impôts)'
                 : 'Credit available from DGI'}
             </p>
@@ -1175,7 +1179,7 @@ export const Treasury = () => {
                     const client = clients.find(c => c.id === invoice.client_id);
                     const clientName = client?.company || client?.name || 'Unknown Client';
                     const payment = salesPayments.find(p => p.invoiceNumber === invoice.document_id);
-                    
+
                     return (
                       <TableRow key={invoice.id} className="hover:bg-section/50">
                         <TableCell className="font-mono text-xs px-3 py-3 whitespace-nowrap font-medium">
@@ -1198,20 +1202,20 @@ export const Treasury = () => {
                         </TableCell>
                         <TableCell className="px-3 py-3 whitespace-nowrap">
                           <div className="scale-90 origin-left">
-                            <StatusBadge 
+                            <StatusBadge
                               status={
                                 invoice.status === 'paid' ? 'success' :
-                                invoice.status === 'overdue' ? 'danger' :
-                                invoice.status === 'sent' ? 'info' :
-                                invoice.status === 'cancelled' ? 'default' :
-                                'warning'
+                                  invoice.status === 'overdue' ? 'danger' :
+                                    invoice.status === 'sent' ? 'info' :
+                                      invoice.status === 'cancelled' ? 'default' :
+                                        'warning'
                               }
                             >
-                              {invoice.status === 'sent' ? 'Sent' : 
-                               invoice.status === 'paid' ? 'Paid' :
-                               invoice.status === 'overdue' ? 'Overdue' :
-                               invoice.status === 'cancelled' ? 'Cancelled' :
-                               'Draft'}
+                              {invoice.status === 'sent' ? 'Sent' :
+                                invoice.status === 'paid' ? 'Paid' :
+                                  invoice.status === 'overdue' ? 'Overdue' :
+                                    invoice.status === 'cancelled' ? 'Cancelled' :
+                                      'Draft'}
                             </StatusBadge>
                           </div>
                         </TableCell>
@@ -1278,7 +1282,7 @@ export const Treasury = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Purchase Invoices Section */}
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-foreground mb-3">Purchase Invoices (with Tax)</h3>
@@ -1311,7 +1315,7 @@ export const Treasury = () => {
                       const supplier = suppliers.find(s => s.id === invoice.supplier_id);
                       const supplierName = supplier?.company || supplier?.name || 'Unknown Supplier';
                       const payment = purchasePayments.find(p => p.invoiceNumber === invoice.document_id);
-                      
+
                       return (
                         <TableRow key={invoice.id} className="hover:bg-section/50">
                           <TableCell className="font-mono text-xs px-3 py-3 whitespace-nowrap font-medium">
@@ -1334,20 +1338,20 @@ export const Treasury = () => {
                           </TableCell>
                           <TableCell className="px-3 py-3 whitespace-nowrap">
                             <div className="scale-90 origin-left">
-                              <StatusBadge 
+                              <StatusBadge
                                 status={
                                   invoice.status === 'paid' ? 'success' :
-                                  invoice.status === 'overdue' ? 'danger' :
-                                  invoice.status === 'received' ? 'info' :
-                                  invoice.status === 'cancelled' ? 'default' :
-                                  'warning'
+                                    invoice.status === 'overdue' ? 'danger' :
+                                      invoice.status === 'received' ? 'info' :
+                                        invoice.status === 'cancelled' ? 'default' :
+                                          'warning'
                                 }
                               >
-                                {invoice.status === 'received' ? 'Received' : 
-                                 invoice.status === 'paid' ? 'Paid' :
-                                 invoice.status === 'overdue' ? 'Overdue' :
-                                 invoice.status === 'cancelled' ? 'Cancelled' :
-                                 'Draft'}
+                                {invoice.status === 'received' ? 'Received' :
+                                  invoice.status === 'paid' ? 'Paid' :
+                                    invoice.status === 'overdue' ? 'Overdue' :
+                                      invoice.status === 'cancelled' ? 'Cancelled' :
+                                        'Draft'}
                               </StatusBadge>
                             </div>
                           </TableCell>
@@ -1400,7 +1404,7 @@ export const Treasury = () => {
                       const supplier = suppliers.find(s => s.id === order.supplier_id);
                       const supplierName = supplier?.company || supplier?.name || 'Unknown Supplier';
                       const payment = purchasePayments.find(p => p.invoiceNumber === order.document_id);
-                      
+
                       return (
                         <TableRow key={order.id} className="hover:bg-section/50">
                           <TableCell className="font-mono text-xs px-3 py-3 whitespace-nowrap font-medium">
@@ -1417,19 +1421,19 @@ export const Treasury = () => {
                           </TableCell>
                           <TableCell className="px-3 py-3 whitespace-nowrap">
                             <div className="scale-90 origin-left">
-                              <StatusBadge 
+                              <StatusBadge
                                 status={
                                   order.status === 'received' ? 'success' :
-                                  order.status === 'confirmed' ? 'info' :
-                                  order.status === 'cancelled' ? 'default' :
-                                  'warning'
+                                    order.status === 'confirmed' ? 'info' :
+                                      order.status === 'cancelled' ? 'default' :
+                                        'warning'
                                 }
                               >
-                                {order.status === 'confirmed' ? 'Confirmed' : 
-                                 order.status === 'received' ? 'Received' :
-                                 order.status === 'cancelled' ? 'Cancelled' :
-                                 order.status === 'sent' ? 'Sent' :
-                                 'Draft'}
+                                {order.status === 'confirmed' ? 'Confirmed' :
+                                  order.status === 'received' ? 'Received' :
+                                    order.status === 'cancelled' ? 'Cancelled' :
+                                      order.status === 'sent' ? 'Sent' :
+                                        'Draft'}
                               </StatusBadge>
                             </div>
                           </TableCell>
@@ -1490,42 +1494,42 @@ export const Treasury = () => {
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={cashFlowData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis 
-                dataKey="month" 
+              <XAxis
+                dataKey="month"
                 tick={{ fill: '#64748b', fontSize: 12 }}
                 stroke="#cbd5e1"
               />
-              <YAxis 
+              <YAxis
                 tick={{ fill: '#64748b', fontSize: 12 }}
                 stroke="#cbd5e1"
               />
-              <Tooltip 
+              <Tooltip
                 formatter={(value) => formatMAD(value as number)}
-                contentStyle={{ 
+                contentStyle={{
                   backgroundColor: '#ffffff',
                   border: '1px solid #e2e8f0',
                   borderRadius: '8px',
                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                 }}
               />
-              <Legend 
+              <Legend
                 wrapperStyle={{ paddingTop: '20px' }}
                 iconType="line"
               />
-              <Line 
-                type="monotone" 
-                dataKey="cashIn" 
-                name="Cash In" 
-                stroke="#10b981" 
+              <Line
+                type="monotone"
+                dataKey="cashIn"
+                name="Cash In"
+                stroke="#10b981"
                 strokeWidth={3}
                 dot={{ fill: '#10b981', r: 5, strokeWidth: 2, stroke: '#ffffff' }}
                 activeDot={{ r: 7, strokeWidth: 2, stroke: '#10b981' }}
               />
-              <Line 
-                type="monotone" 
-                dataKey="cashOut" 
-                name="Cash Out" 
-                stroke="#ef4444" 
+              <Line
+                type="monotone"
+                dataKey="cashOut"
+                name="Cash Out"
+                stroke="#ef4444"
                 strokeWidth={3}
                 dot={{ fill: '#ef4444', r: 5, strokeWidth: 2, stroke: '#ffffff' }}
                 activeDot={{ r: 7, strokeWidth: 2, stroke: '#ef4444' }}
@@ -1557,7 +1561,7 @@ export const Treasury = () => {
             const salesPendingAmount = salesPending.reduce((sum, p) => sum + p.amount, 0);
             const purchasePendingAmount = purchasePending.reduce((sum, p) => sum + p.amount, 0);
             const pendingAmount = salesPendingAmount - purchasePendingAmount; // Sales add, purchases subtract
-            
+
             return (
               <div key={account.id} className="p-4 border border-border rounded-lg">
                 <div className="flex items-center justify-between mb-2">
@@ -1746,8 +1750,8 @@ export const Treasury = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="method">Payment Method *</Label>
-                <Select 
-                  value={formPaymentMethod} 
+                <Select
+                  value={formPaymentMethod}
                   onValueChange={(value) => setFormPaymentMethod(value as 'cash' | 'check' | 'bank_transfer')}
                 >
                   <SelectTrigger>
@@ -1761,7 +1765,7 @@ export const Treasury = () => {
                 </Select>
               </div>
             </div>
-            
+
             {formPaymentMethod === 'check' && (
               <>
                 <div className="grid grid-cols-3 gap-4">

@@ -500,6 +500,7 @@ export const Invoicing = () => {
         toast({
           title: "PDF Ready",
           description: "PDF downloaded. Please open and print manually.",
+          variant: "success",
         });
       }
     } catch (error) {
@@ -615,6 +616,7 @@ export const Invoicing = () => {
       toast({
         title: "Document Updated",
         description: "Document has been updated successfully.",
+        variant: "success",
       });
     } catch (error) {
       toast({
@@ -783,6 +785,7 @@ export const Invoicing = () => {
       toast({
         title: "Document Created",
         description: "Document has been created successfully.",
+        variant: "success",
       });
     } catch (error) {
       console.error('Error creating document:', error);

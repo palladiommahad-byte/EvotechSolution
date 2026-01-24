@@ -169,6 +169,7 @@ export const Inventory = () => {
       toast({
         title: t('inventory.categoryCreated'),
         description: t('inventory.categoryCreatedDescription', { name: trimmedName }),
+        variant: "success",
       });
     }
   };
@@ -244,6 +245,7 @@ export const Inventory = () => {
         toast({
           title: t('inventory.productUpdated'),
           description: t('inventory.productUpdatedDescription', { name: productName }),
+          variant: "success",
         });
       } catch (error) {
         console.error('Error updating product:', error);
@@ -332,6 +334,7 @@ export const Inventory = () => {
       toast({
         title: t('inventory.productCreated'),
         description: t('inventory.productCreatedDescription', { name: newProduct.name }),
+        variant: "success",
       });
     } catch (error) {
       console.error('Error creating product:', error);

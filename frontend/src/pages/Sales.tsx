@@ -767,6 +767,7 @@ export const Sales = () => {
       toast({
         title: "Document Created",
         description: `${documentTypeNames[documentType] || 'Document'} "${documentNumber}" has been created successfully.`,
+        variant: "success",
       });
     } catch (error) {
       console.error('Error creating document:', error);

@@ -368,6 +368,7 @@ export const CRM = () => {
                 defaultValue: "Contact could not be deleted permanently due to existing records, so it was marked as inactive instead.",
                 contactName
               }),
+              variant: "success",
             });
             return;
           } catch (archiveError) {
@@ -398,6 +399,7 @@ export const CRM = () => {
       toast({
         title: t('crm.contactCreated'),
         description: t('crm.contactCreatedDescription', { contactType, contactName }),
+        variant: "success",
       });
     } catch (error) {
       toast({
@@ -423,6 +425,7 @@ export const CRM = () => {
         toast({
           title: t('crm.contactUpdated'),
           description: t('crm.contactUpdatedDescription', { contactType, contactName }),
+          variant: "success",
         });
       } catch (error) {
         toast({

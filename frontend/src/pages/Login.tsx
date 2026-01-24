@@ -49,17 +49,18 @@ export const Login = () => {
 
     try {
       const success = await login(email, password);
-      
+
       if (success) {
         toast({
           title: t('auth.welcomeBackToast'),
           description: t('auth.welcomeBackToastDescription'),
+          variant: "success",
         });
-        
+
         // Small delay to ensure state is updated before navigation
         // This prevents the redirect loop issue
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         // Redirect to the page user was trying to access, or home
         const from = (location.state as { from?: Location })?.from?.pathname || '/';
         navigate(from, { replace: true });
@@ -89,14 +90,14 @@ export const Login = () => {
           <div className="absolute top-0 left-0 w-96 h-96 bg-primary-foreground rounded-full -translate-x-1/2 -translate-y-1/2" />
           <div className="absolute bottom-0 right-0 w-64 h-64 bg-primary-foreground rounded-full translate-x-1/2 translate-y-1/2" />
         </div>
-        
+
         <div className="relative z-10">
           <div className="flex items-center gap-3">
             {companyInfo.logo ? (
               <div className="w-16 h-16 rounded-xl bg-primary-foreground/10 flex items-center justify-center overflow-hidden border border-primary-foreground/20">
-                <img 
-                  src={companyInfo.logo} 
-                  alt={companyInfo.name} 
+                <img
+                  src={companyInfo.logo}
+                  alt={companyInfo.name}
                   className="w-full h-full object-contain p-2"
                 />
               </div>
@@ -110,7 +111,7 @@ export const Login = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="relative z-10">
           <h1 className="text-4xl font-heading font-bold text-primary-foreground mb-4">
             {t('auth.inventoryMadeForMorocco').split('\n').map((line, i, arr) => (
@@ -124,7 +125,7 @@ export const Login = () => {
             {t('auth.manageInventoryDescription')}
           </p>
         </div>
-        
+
         <div className="relative z-10">
           <p className="text-sm text-primary-foreground/60">
             © {new Date().getFullYear()} {companyInfo.name}. {t('auth.allRightsReserved')}
@@ -139,9 +140,9 @@ export const Login = () => {
           <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
             {companyInfo.logo ? (
               <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden border border-primary/20">
-                <img 
-                  src={companyInfo.logo} 
-                  alt={companyInfo.name} 
+                <img
+                  src={companyInfo.logo}
+                  alt={companyInfo.name}
                   className="w-full h-full object-contain p-2"
                 />
               </div>
@@ -161,9 +162,9 @@ export const Login = () => {
               {companyInfo.logo && (
                 <div className="flex justify-center mb-6">
                   <div className="w-20 h-20 rounded-xl bg-primary/5 flex items-center justify-center overflow-hidden border border-border">
-                    <img 
-                      src={companyInfo.logo} 
-                      alt={companyInfo.name} 
+                    <img
+                      src={companyInfo.logo}
+                      alt={companyInfo.name}
                       className="w-full h-full object-contain p-3"
                     />
                   </div>

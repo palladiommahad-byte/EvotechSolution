@@ -156,8 +156,10 @@ function toast({ ...props }: Toast) {
     },
   });
 
-  // Auto-dismiss after duration (default 5000ms, use Infinity to disable)
-  const duration = props.duration === Infinity ? Infinity : (props.duration || 5000);
+  // Auto-dismiss after duration (default 5000ms, success 2000ms, use Infinity to disable)
+  const duration = props.duration === Infinity
+    ? Infinity
+    : (props.duration || (props.variant === "success" ? 2000 : 5000));
 
   if (duration !== Infinity) {
     setTimeout(() => {

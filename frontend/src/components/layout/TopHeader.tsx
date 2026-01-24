@@ -38,6 +38,7 @@ export const TopHeader = () => {
     toast({
       title: t('auth.loggedOut'),
       description: t('auth.loggedOutDescription'),
+      variant: "success",
     });
     navigate('/login', { replace: true });
   };
