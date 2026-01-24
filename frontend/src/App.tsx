@@ -32,7 +32,19 @@ import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      retry: 1,
+      staleTime: 0, // Data is immediately stale, ensuring fresh data after invalidation
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <ErrorBoundary>

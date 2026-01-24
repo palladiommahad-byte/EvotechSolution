@@ -54,6 +54,7 @@ export interface PurchaseDocument {
   note?: string;
   attachment_url?: string | null;
   checkNumber?: string;
+  warehouseId?: string;
   // Additional fields for internal use
   _internalId?: string; // database ID
 }
@@ -63,6 +64,7 @@ interface PurchasesContextType {
   purchaseOrders: PurchaseDocument[];
   purchaseInvoices: PurchaseDocument[];
   deliveryNotes: PurchaseDocument[];
+  allDeliveryNotes: PurchaseDocument[];
 
   // Loading state
   isLoading: boolean;
@@ -152,6 +154,7 @@ const deliveryNoteToPurchaseDocument = (dn: DeliveryNoteWithItems): PurchaseDocu
   status: mapDeliveryNoteStatusToUI(dn.status),
   type: 'delivery_note',
   note: dn.note || undefined,
+  warehouseId: dn.warehouse_id || undefined,
   _internalId: dn.id,
 });
 
@@ -196,6 +199,12 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     [deliveryNotesData]
   );
 
+  // All delivery notes for ID generation purposes
+  const allDeliveryNotes = useMemo(
+    () => deliveryNotesData.map(deliveryNoteToPurchaseDocument),
+    [deliveryNotesData]
+  );
+
   const isLoading = isLoadingPO || isLoadingPI || isLoadingDN;
 
   // Mutations for purchase orders
@@ -215,7 +224,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       }
 
       return purchaseOrdersService.create({
-        document_id: data.documentId || `PO-${Date.now()}`,
+        document_id: data.documentId || `BC-${Date.now()}`,
         supplier_id: supplierId,
         date: data.date,
         subtotal: data.total,
@@ -387,7 +396,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       const total = subtotal + vatAmount;
 
       return purchaseInvoicesService.create({
-        document_id: data.documentId || `PI-${Date.now()}`,
+        document_id: data.documentId || `FA-${Date.now()}`,
         supplier_id: supplierId,
         date: data.date,
         due_date: data.dueDate,
@@ -567,8 +576,9 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       const supplierId = data.supplierData?.id || data.supplier;
 
       return deliveryNotesService.create({
-        document_id: data.documentId || `DN-${Date.now()}`,
+        document_id: data.documentId || `BL-${Date.now()}`,
         supplier_id: supplierId,
+        warehouse_id: data.warehouseId,
         date: data.date,
         note: data.note,
         document_type: 'delivery_note',
@@ -582,6 +592,9 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases', 'delivery_notes'] });
+      // Invalidate products and stock items to reflect stock changes
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stockItems'] });
       toast({ title: 'Delivery note created successfully', variant: 'success' });
     },
     onError: (error: Error) => {
@@ -638,6 +651,7 @@ export const PurchasesProvider = ({ children }: { children: ReactNode }) => {
       purchaseOrders,
       purchaseInvoices,
       deliveryNotes: purchaseDeliveryNotes,
+      allDeliveryNotes,
       isLoading,
       createPurchaseOrder: async (data) => { await createPurchaseOrderMutation.mutateAsync(data); },
       updatePurchaseOrder: async (id, data) => { await updatePurchaseOrderMutation.mutateAsync({ id, data }); },

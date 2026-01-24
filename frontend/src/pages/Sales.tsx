@@ -96,6 +96,7 @@ export const Sales = () => {
     invoices,
     estimates,
     deliveryNotes,
+    allDeliveryNotes,
     divers,
     creditNotes,
     isLoading: isLoadingSales,
@@ -280,6 +281,11 @@ export const Sales = () => {
 
   // Format document ID with French prefix based on document type
   const formatDocumentId = (id: string, docType: string): string => {
+    // If ID already has a standard prefix (PREFIX-MM/YY/NNNN), return as is
+    if (id.match(/^[A-Z]{2,3}-\d{2}\/\d{2}\/\d{4}$/)) {
+      return id;
+    }
+
     const prefixes: Record<string, string> = {
       invoice: 'FC',
       estimate: 'DV',
@@ -289,7 +295,7 @@ export const Sales = () => {
       statement: 'RL',
     };
 
-    // Replace English database prefixes with French ones
+    // Replace English database prefixes with French ones for legacy support
     if (id.startsWith('INV-')) return id.replace('INV-', 'FC-');
     if (id.startsWith('EST-')) return id.replace('EST-', 'DV-');
     if (id.startsWith('DN-')) return id.replace('DN-', 'BL-');
@@ -299,7 +305,7 @@ export const Sales = () => {
 
     const prefix = prefixes[docType] || 'DOC';
 
-    // If ID already has a prefix, return as is
+    // If ID already has any uppercase prefix, return as is
     if (id.match(/^[A-Z]{2,4}-/)) {
       return id;
     }
@@ -636,8 +642,15 @@ export const Sales = () => {
       return;
     }
 
-    // Generate unique document number using database function
-    // This ensures uniqueness by checking the database directly
+    // Generate unique document number using client-side generator with all existing documents
+    // This ensures uniqueness by checking against all documents in state
+    const allExistingDocuments = [
+      ...allDeliveryNotes,
+      ...invoices,
+      ...estimates,
+      ...creditNotes,
+    ];
+
     let documentNumber: string;
     try {
       const { generateDocumentNumberFromDB } = await import('@/lib/document-number-service');
@@ -645,21 +658,15 @@ export const Sales = () => {
         documentType === 'invoice' ? 'invoice' :
           documentType === 'estimate' ? 'estimate' :
             documentType === 'delivery_note' ? 'delivery_note' :
-              documentType === 'divers' ? 'delivery_note' : // divers uses delivery_note type in DB
+              documentType === 'divers' ? 'divers' :
                 documentType === 'credit_note' ? 'credit_note' :
                   'statement',
+        allExistingDocuments,
         formDate
       );
     } catch (error) {
-      console.warn('Failed to generate document number from database, using fallback:', error);
-      // Fallback to client-side generation if database function fails
-      const allExistingDocuments = [
-        ...deliveryNotes,
-        ...divers,
-        ...invoices,
-        ...estimates,
-        ...creditNotes,
-      ];
+      console.warn('Failed to generate document number, using fallback:', error);
+      // Fallback to direct generator call
       documentNumber = generateDocumentNumber(
         documentType === 'invoice' ? 'invoice' :
           documentType === 'estimate' ? 'estimate' :
@@ -1239,8 +1246,8 @@ export const Sales = () => {
                               <SelectValue placeholder={t('documents.linkToOrder')} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="inv1">INV-2024-001</SelectItem>
-                              <SelectItem value="inv2">INV-2024-002</SelectItem>
+                              <SelectItem value="fc1">FC-01/26/0001</SelectItem>
+                              <SelectItem value="fc2">FC-01/26/0002</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -2826,8 +2833,8 @@ export const Sales = () => {
                             <SelectValue placeholder={t('documents.linkToOriginalInvoice')} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="inv1">INV-2024-001</SelectItem>
-                            <SelectItem value="inv2">INV-2024-002</SelectItem>
+                            <SelectItem value="fc1">FC-01/26/0001</SelectItem>
+                            <SelectItem value="fc2">FC-01/26/0002</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

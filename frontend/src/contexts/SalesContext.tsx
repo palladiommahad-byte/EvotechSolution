@@ -61,6 +61,7 @@ interface SalesContextType {
   invoices: SalesDocument[];
   estimates: SalesDocument[];
   deliveryNotes: SalesDocument[];
+  allDeliveryNotes: SalesDocument[];
   divers: SalesDocument[];
   creditNotes: SalesDocument[];
 
@@ -349,7 +350,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       }
 
       return invoicesService.create({
-        document_id: data.documentId || `INV-${Date.now()}`,
+        document_id: data.documentId || `FC-${Date.now()}`,
         client_id: clientId,
         date: data.date,
         due_date: data.dueDate,
@@ -560,7 +561,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       }
 
       return estimatesService.create({
-        document_id: data.documentId || `EST-${Date.now()}`,
+        document_id: data.documentId || `DV-${Date.now()}`,
         client_id: clientId,
         date: data.date,
         note: data.note,
@@ -655,7 +656,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       }
 
       return deliveryNotesService.create({
-        document_id: data.documentId || `DN-${Date.now()}`,
+        document_id: data.documentId || `BL-${Date.now()}`,
         client_id: clientId,
         date: data.date,
         document_type: 'delivery_note',
@@ -761,7 +762,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       }
 
       return deliveryNotesService.create({
-        document_id: data.documentId || `DIV-${Date.now()}`,
+        document_id: data.documentId || `BL-${Date.now()}`,
         client_id: clientId,
         date: data.date,
         document_type: 'divers',
@@ -864,7 +865,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       }
 
       return creditNotesService.create({
-        document_id: data.documentId || `CN-${Date.now()}`,
+        document_id: data.documentId || `AV-${Date.now()}`,
         client_id: clientId,
         date: data.date,
         note: data.note,
@@ -953,6 +954,7 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
     invoices,
     estimates,
     deliveryNotes,
+    allDeliveryNotes,
     divers,
     creditNotes,
     isLoading,

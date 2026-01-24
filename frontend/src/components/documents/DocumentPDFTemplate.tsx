@@ -328,7 +328,7 @@ export const DocumentPDFTemplate: React.FC<DocumentPDFTemplateProps> = ({
   const formatDocumentId = (id: string, docType: string): string => {
     // Define French prefixes for each document type
     const prefixes: Record<string, string> = {
-      invoice: 'FC',                    // Facture
+      invoice: 'FC',                    // Facture Client
       estimate: 'DV',                   // Devis
       delivery_note: 'BL',              // Bon de Livraison
       purchase_order: 'BC',             // Bon de Commande
@@ -336,11 +336,17 @@ export const DocumentPDFTemplate: React.FC<DocumentPDFTemplateProps> = ({
       statement: 'RL',                  // Relevé
       purchase_invoice: 'FA',           // Facture d'Achat
       purchase_delivery_note: 'BL',     // Bon de Livraison
+      divers: 'BL',                     // Bon de Livraison Divers
     };
 
     const prefix = prefixes[docType] || 'DOC';
 
-    // Replace English database prefixes with French ones
+    // If ID already has a standard prefix (PREFIX-MM/YY/NNNN), return as is
+    if (id.match(/^[A-Z]{2,3}-\d{2}\/\d{2}\/\d{4}$/)) {
+      return id;
+    }
+
+    // Handle legacy English prefixes if they still exist in DB
     if (id.startsWith('INV-')) return id.replace('INV-', 'FC-');
     if (id.startsWith('EST-')) return id.replace('EST-', 'DV-');
     if (id.startsWith('DN-')) return id.replace('DN-', 'BL-');
@@ -350,7 +356,7 @@ export const DocumentPDFTemplate: React.FC<DocumentPDFTemplateProps> = ({
     if (id.startsWith('PO-')) return id.replace('PO-', 'BC-');
     if (id.startsWith('PI-')) return id.replace('PI-', 'FA-');
 
-    // If ID already has a prefix, return as is
+    // If ID already has any uppercase prefix, return as is
     if (id.match(/^[A-Z]{2,4}-/)) {
       return id;
     }

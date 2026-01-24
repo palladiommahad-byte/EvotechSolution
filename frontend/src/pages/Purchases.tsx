@@ -56,6 +56,7 @@ import { CurrencyDisplay } from '@/components/ui/CurrencyDisplay';
 import { useContacts, UIContact } from '@/contexts/ContactsContext';
 import { usePurchases, PurchaseDocument, PurchaseItem } from '@/contexts/PurchasesContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useWarehouse } from '@/contexts/WarehouseContext';
 import { useToast } from '@/hooks/use-toast';
 import { generateDocumentNumber } from '@/lib/document-number-generator';
 import {
@@ -85,11 +86,13 @@ export const Purchases = () => {
   const { suppliers, getSupplierById } = useContacts();
   const { products = [] } = useProducts();
   const { companyInfo } = useCompany();
+  const { warehouses } = useWarehouse();
   const { toast } = useToast();
   const {
     purchaseOrders,
     purchaseInvoices,
     deliveryNotes,
+    allDeliveryNotes,
     isLoading: isLoadingPurchases,
     createPurchaseOrder,
     updatePurchaseOrder,
@@ -109,6 +112,7 @@ export const Purchases = () => {
     { id: '1', description: '', quantity: 1, unitPrice: 0, total: 0 },
   ]);
   const [formSupplier, setFormSupplier] = useState('');
+  const [formWarehouse, setFormWarehouse] = useState('');
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formPaymentMethod, setFormPaymentMethod] = useState<'cash' | 'check' | 'bank_transfer'>('cash');
   const [formDueDate, setFormDueDate] = useState('');
@@ -260,20 +264,25 @@ export const Purchases = () => {
 
   // Format document ID with French prefix based on document type
   const formatDocumentId = (id: string, docType: string): string => {
+    // If ID already has a standard prefix (PREFIX-MM/YY/NNNN), return as is
+    if (id.match(/^[A-Z]{2,3}-\d{2}\/\d{2}\/\d{4}$/)) {
+      return id;
+    }
+
     const prefixes: Record<string, string> = {
       purchase_order: 'BC',
       purchase_invoice: 'FA',
       delivery_note: 'BL',
     };
 
-    // Replace English database prefixes with French ones
+    // Replace English database prefixes with French ones for legacy support
     if (id.startsWith('PO-')) return id.replace('PO-', 'BC-');
     if (id.startsWith('PI-')) return id.replace('PI-', 'FA-');
     if (id.startsWith('DN-')) return id.replace('DN-', 'BL-');
 
     const prefix = prefixes[docType] || 'DOC';
 
-    // If ID already has a prefix, return as is
+    // If ID already has any uppercase prefix, return as is
     if (id.match(/^[A-Z]{2,4}-/)) {
       return id;
     }
@@ -621,11 +630,33 @@ export const Purchases = () => {
       return;
     }
 
+    // Collect all existing documents to ensure unique document number
+    const allExistingDocuments = [
+      ...purchaseOrders,
+      ...allDeliveryNotes,
+      ...purchaseInvoices,
+    ];
+
     // Generate unique document number using database function or use manual input
     let documentNumber: string;
 
     if (isManualId && manualDocumentId.trim()) {
       documentNumber = manualDocumentId.trim();
+
+      // Validate uniqueness
+      const alreadyExists = allExistingDocuments.some(doc =>
+        doc.id.toLowerCase() === documentNumber.toLowerCase() ||
+        doc.documentId.toLowerCase() === documentNumber.toLowerCase()
+      );
+
+      if (alreadyExists) {
+        toast({
+          title: t('common.error', { defaultValue: 'Error' }),
+          description: t('documents.idAlreadyExists', { defaultValue: 'This document ID already exists. Please use a unique ID.' }),
+          variant: "destructive",
+        });
+        return;
+      }
     } else {
       try {
         const { generateDocumentNumberFromDB } = await import('@/lib/document-number-service');
@@ -634,16 +665,12 @@ export const Purchases = () => {
             documentType === 'purchase_order' ? 'purchase_order' :
               documentType === 'delivery_note' ? 'delivery_note' :
                 'statement',
+          allExistingDocuments,
           formDate
         );
       } catch (error) {
-        console.warn('Failed to generate document number from database, using fallback:', error);
-        // Fallback to client-side generation if database function fails
-        const allExistingDocuments = [
-          ...purchaseOrders,
-          ...deliveryNotes,
-          ...purchaseInvoices,
-        ];
+        console.warn('Failed to generate document number, using fallback:', error);
+        // Fallback to direct generator call
         documentNumber = generateDocumentNumber(
           documentType === 'invoice' ? 'purchase_invoice' :
             documentType === 'purchase_order' ? 'purchase_order' :
@@ -702,6 +729,7 @@ export const Purchases = () => {
         checkNumber: documentType === 'invoice' && formPaymentMethod === 'check' ? (formCheckNumber || undefined) : undefined,
         dueDate: formDueDate || undefined,
         note: formNote || undefined,
+        warehouseId: formWarehouse || undefined,
       };
 
       // Create in database (except statements which are mock)
@@ -958,6 +986,9 @@ export const Purchases = () => {
     setActiveTab(tabValue);
     setDocumentType(tabValue);
     setSelectedDocuments(new Set()); // Clear selection when switching tabs
+    // Reset manual ID state when switching tabs
+    setIsManualId(false);
+    setManualDocumentId('');
   };
 
   const totalPending = purchaseOrders
@@ -1056,7 +1087,7 @@ export const Purchases = () => {
             </div>
             <div>
               <p className="text-xl sm:text-2xl font-heading font-bold text-foreground break-words overflow-visible whitespace-normal leading-tight">{formatMAD(totalPending)}</p>
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('purchases.pendingValue', { defaultValue: 'Pending Value' })}>{t('purchases.pendingValue', { defaultValue: 'Pending Value' })}</p>
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground line-clamp-1" title={t('purchases.pendingValue')}>{t('purchases.pendingValue')}</p>
             </div>
           </div>
         </div>
@@ -1140,8 +1171,41 @@ export const Purchases = () => {
                         <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
                       </div>
                       <div className="space-y-2">
-                        <Label>{t('documents.purchaseOrderNumber')}</Label>
-                        <Input placeholder={t('common.autoGenerated')} disabled />
+                        <div className="flex items-center justify-between">
+                          <Label>{t('documents.purchaseOrderNumber')}</Label>
+                          {isManualId ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setIsManualId(false);
+                                setManualDocumentId('');
+                              }}
+                              className="h-6 text-xs"
+                            >
+                              {t('common.autoGenerate')}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsManualId(true)}
+                              className="h-6 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              {t('common.manualEntry')}
+                            </Button>
+                          )}
+                        </div>
+                        {isManualId ? (
+                          <Input
+                            placeholder={t('documents.enterPONumber')}
+                            value={manualDocumentId}
+                            onChange={(e) => setManualDocumentId(e.target.value)}
+                            className="bg-background"
+                          />
+                        ) : (
+                          <Input placeholder={t('common.autoGenerated')} disabled />
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>{t('documents.expectedDeliveryDate')}</Label>
@@ -1476,44 +1540,94 @@ export const Purchases = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                   <div className="card-elevated p-6">
-                    <h3 className="font-heading font-semibold text-foreground mb-4">Delivery Information</h3>
+                    <h3 className="font-heading font-semibold text-foreground mb-4">{t('purchases.deliveryInformation')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Select Supplier</Label>
-                        <Select>
+                        <Label>{t('purchases.selectSupplier')}</Label>
+                        <Select value={formSupplier} onValueChange={setFormSupplier}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Choose a supplier" />
+                            <SelectValue placeholder={t('documents.chooseSupplier')} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="tanger">Tanger Import Export</SelectItem>
-                            <SelectItem value="fes">Fès Machinery</SelectItem>
-                            <SelectItem value="rabat">Rabat Components</SelectItem>
+                            {suppliers.map((supplier) => (
+                              <SelectItem key={supplier.id} value={supplier.id}>
+                                {supplier.company || supplier.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>Delivery Date</Label>
-                        <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                        <Label>{t('common.date')}</Label>
+                        <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
                       </div>
                       <div className="space-y-2">
-                        <Label>Delivery Note Number</Label>
-                        <Input placeholder="Auto-generated" disabled />
+                        <div className="flex items-center justify-between">
+                          <Label>{t('documents.deliveryNoteNumber')}</Label>
+                          {isManualId ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setIsManualId(false);
+                                setManualDocumentId('');
+                              }}
+                              className="h-6 text-xs"
+                            >
+                              {t('common.autoGenerate')}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsManualId(true)}
+                              className="h-6 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              {t('common.manualEntry')}
+                            </Button>
+                          )}
+                        </div>
+                        {isManualId ? (
+                          <Input
+                            placeholder={t('documents.enterDNNumber')}
+                            value={manualDocumentId}
+                            onChange={(e) => setManualDocumentId(e.target.value)}
+                            className="bg-background"
+                          />
+                        ) : (
+                          <Input placeholder={t('common.autoGenerated')} disabled />
+                        )}
                       </div>
                       <div className="space-y-2">
-                        <Label>Reference Purchase Order</Label>
+                        <Label>{t('documents.referencePurchaseOrder')}</Label>
                         <Select>
                           <SelectTrigger>
-                            <SelectValue placeholder="Link to PO" />
+                            <SelectValue placeholder={t('purchases.linkToPOOrDN')} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="po1">PO-2024-001</SelectItem>
-                            <SelectItem value="po2">PO-2024-002</SelectItem>
+                            <SelectItem value="bc1">BC-01/26/0001</SelectItem>
+                            <SelectItem value="bc2">BC-01/26/0002</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <Label>Delivery Address</Label>
-                        <Input placeholder="Warehouse address or custom delivery location" />
+                        <Label>{t('documents.deliveryAddress')}</Label>
+                        <Input placeholder={t('documents.clientDeliveryAddress')} />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>{t('settings.warehouses')}</Label>
+                        <Select value={formWarehouse} onValueChange={setFormWarehouse}>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t('settings.activeWarehouse')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {warehouses.map((w) => (
+                              <SelectItem key={w.id} value={w.id}>
+                                {w.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   </div>
@@ -1621,7 +1735,7 @@ export const Purchases = () => {
                       </div>
                     </div>
                     <div className="mt-6 space-y-2">
-                      <Button className="w-full gap-2 btn-primary-gradient">
+                      <Button className="w-full gap-2 btn-primary-gradient" onClick={handleCreateDocument}>
                         <Send className="w-4 h-4" />
                         {t('documents.createDeliveryNote')}
                       </Button>
@@ -1675,22 +1789,22 @@ export const Purchases = () => {
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" className="gap-2">
                             <Download className="w-4 h-4" />
-                            Export Selected
+                            {t('documents.exportSelected')}
                             <ChevronDown className="w-3 h-3" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={handleBulkExportPDF} disabled={selectedDocuments.size === 0}>
                             <FileText className="w-4 h-4 mr-2" />
-                            Export as PDF
+                            {t('documents.exportAsPDF')}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={handleBulkExportExcel} disabled={selectedDocuments.size === 0}>
                             <FileSpreadsheet className="w-4 h-4 mr-2" />
-                            Export as Excel
+                            {t('documents.exportAsExcel')}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={handleBulkExportCSV} disabled={selectedDocuments.size === 0}>
                             <FileSpreadsheet className="w-4 h-4 mr-2" />
-                            Export as CSV
+                            {t('documents.exportAsCSV')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1707,17 +1821,17 @@ export const Purchases = () => {
                             <Checkbox
                               checked={filteredDocuments.length > 0 && selectedDocuments.size === filteredDocuments.length}
                               onCheckedChange={toggleSelectAll}
-                              aria-label="Select all"
+                              aria-label={t('documents.selectAll')}
                             />
                           </div>
                         </TableHead>
-                        <TableHead>Note #</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-center">Items</TableHead>
-                        <TableHead className="text-right">Total (TTC)</TableHead>
-                        <TableHead className="text-center">Status</TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
+                        <TableHead>{t('documents.noteNumber')}</TableHead>
+                        <TableHead>{t('documents.supplier')}</TableHead>
+                        <TableHead>{t('common.date')}</TableHead>
+                        <TableHead className="text-center">{t('documents.items')}</TableHead>
+                        <TableHead className="text-right">{t('documents.totalTTC')}</TableHead>
+                        <TableHead className="text-center">{t('common.status')}</TableHead>
+                        <TableHead className="text-center">{t('common.actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1824,7 +1938,7 @@ export const Purchases = () => {
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <Plus className="w-4 h-4" />
-                {t('documents.createPurchaseInvoice', { defaultValue: 'Create Purchase Invoice' })}
+                {t('documents.createPurchaseInvoice')}
               </TabsTrigger>
               <TabsTrigger
                 value="list"
@@ -1839,7 +1953,7 @@ export const Purchases = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                   <div className="card-elevated p-6">
-                    <h3 className="font-heading font-semibold text-foreground mb-4">{t('purchases.invoiceInformation', { defaultValue: 'Invoice Information' })}</h3>
+                    <h3 className="font-heading font-semibold text-foreground mb-4">{t('purchases.invoiceInformation')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>{t('purchases.selectSupplier')}</Label>
@@ -1873,7 +1987,7 @@ export const Purchases = () => {
                               }}
                               className="h-6 text-xs"
                             >
-                              {t('common.autoGenerate', { defaultValue: 'Auto-generate' })}
+                              {t('common.autoGenerate')}
                             </Button>
                           ) : (
                             <Button
@@ -1882,13 +1996,13 @@ export const Purchases = () => {
                               onClick={() => setIsManualId(true)}
                               className="h-6 text-xs text-muted-foreground hover:text-foreground"
                             >
-                              {t('common.manualEntry', { defaultValue: 'Manual Entry' })}
+                              {t('common.manualEntry')}
                             </Button>
                           )}
                         </div>
                         {isManualId ? (
                           <Input
-                            placeholder={t('documents.enterInvoiceNumber', { defaultValue: 'Enter invoice number' })}
+                            placeholder={t('documents.enterInvoiceNumber')}
                             value={manualDocumentId}
                             onChange={(e) => setManualDocumentId(e.target.value)}
                             className="bg-background"
@@ -1918,10 +2032,10 @@ export const Purchases = () => {
                         <div className="space-y-2 md:col-span-2 p-4 bg-muted/40 rounded-lg border border-border">
                           <Label className="font-medium flex items-center gap-2">
                             <Receipt className="w-4 h-4 text-primary" />
-                            {t('documents.checkNumber', { defaultValue: 'Check Number' })}
+                            {t('documents.checkNumber')}
                           </Label>
                           <Input
-                            placeholder="Enter check number"
+                            placeholder={t('documents.enterCheckNumber', { defaultValue: 'Entrer le numéro du chèque' })}
                             value={formCheckNumber}
                             onChange={(e) => setFormCheckNumber(e.target.value)}
                             className="bg-background"
@@ -1929,21 +2043,21 @@ export const Purchases = () => {
                         </div>
                       )}
                       <div className="space-y-2 md:col-span-2">
-                        <Label>{t('purchases.referenceDocuments', { defaultValue: 'Reference Documents' })}</Label>
+                        <Label>{t('purchases.referenceDocuments')}</Label>
                         <Select>
                           <SelectTrigger>
-                            <SelectValue placeholder={t('purchases.linkToPOOrDN', { defaultValue: 'Link to PO or Delivery Note' })} />
+                            <SelectValue placeholder={t('purchases.linkToPOOrDN')} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="po1">PO-2024-001</SelectItem>
-                            <SelectItem value="dn1">DN-2024-001</SelectItem>
+                            <SelectItem value="none">{t('common.none')}</SelectItem>
+                            {/* In the future, we could map existing purchaseOrders or deliveryNotes here */}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2 md:col-span-2 p-4 bg-muted/40 rounded-lg border border-border">
                         <Label className="font-medium flex items-center gap-2 mb-2">
                           <Paperclip className="w-4 h-4 text-primary" />
-                          {t('common.attachment', { defaultValue: 'Attachment' })} (Image/PDF)
+                          {t('common.attachment')} (Image/PDF)
                         </Label>
                         <div className="flex items-center gap-2">
                           <Input
@@ -2105,7 +2219,7 @@ export const Purchases = () => {
                     <div className="mt-6 space-y-2">
                       <Button className="w-full gap-2 btn-primary-gradient" onClick={handleCreateDocument}>
                         <Send className="w-4 h-4" />
-                        {t('purchases.createAndRecordInvoice', { defaultValue: 'Create & Record Invoice' })}
+                        {t('purchases.createAndRecordInvoice')}
                       </Button>
                       <Button variant="outline" className="w-full gap-2" onClick={handlePreviewPDF}>
                         <Download className="w-4 h-4" />
@@ -2124,7 +2238,7 @@ export const Purchases = () => {
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        placeholder={t('purchases.searchByInvoiceOrSupplier', { defaultValue: 'Search by invoice # or supplier...' })}
+                        placeholder={t('purchases.searchByInvoiceOrSupplier')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-10"
@@ -2309,7 +2423,7 @@ export const Purchases = () => {
                 className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <TrendingUp className="w-4 h-4" />
-                {t('purchases.invoiceStatistics', { defaultValue: 'Invoice Statistics' })}
+                {t('purchases.invoiceStatistics')}
               </TabsTrigger>
               <TabsTrigger
                 value="list"
@@ -2461,8 +2575,8 @@ export const Purchases = () => {
               {/* Invoice Breakdown Table */}
               <div className="card-elevated overflow-hidden">
                 <div className="p-6 border-b border-border">
-                  <h3 className="font-heading font-semibold text-foreground">{t('purchases.invoiceBreakdownByStatus', { defaultValue: 'Purchase Invoice Breakdown by Status' })}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">{t('purchases.detailedViewPurchaseInvoices', { defaultValue: 'Detailed view of all purchase invoices with payment status' })}</p>
+                  <h3 className="font-heading font-semibold text-foreground">{t('purchases.invoiceBreakdownByStatus')}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{t('purchases.detailedViewPurchaseInvoices')}</p>
                 </div>
                 <Table>
                   <TableHeader>
@@ -2736,7 +2850,7 @@ export const Purchases = () => {
                             <Checkbox
                               checked={filteredDocuments.length > 0 && selectedDocuments.size === filteredDocuments.length}
                               onCheckedChange={toggleSelectAll}
-                              aria-label="Select all"
+                              aria-label={t('documents.selectAll')}
                             />
                           </div>
                         </TableHead>

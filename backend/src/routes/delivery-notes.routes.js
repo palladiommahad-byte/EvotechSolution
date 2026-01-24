@@ -184,12 +184,64 @@ router.post('/', asyncHandler(async (req, res) => {
 
         const deliveryNote = noteResult.rows[0];
 
+        // Determine movement direction:
+        // Sales BL (client_id present) or Divers (document_type='divers') -> negative (out)
+        // Purchase BL (supplier_id present) -> positive (in)
+        const isOut = client_id || document_type === 'divers';
+        const movementType = isOut ? 'out' : 'in';
+
         for (const item of items) {
+            // 1. Insert into delivery_note_items
             await client.query(
                 `INSERT INTO delivery_note_items (delivery_note_id, product_id, description, quantity, unit_price, total)
          VALUES ($1, $2, $3, $4, $5, $6)`,
                 [deliveryNote.id, item.product_id || null, item.description, item.quantity, item.unit_price, item.quantity * item.unit_price]
             );
+
+            // 2. Update product stock if product_id is provided
+            if (item.product_id) {
+                const quantityChange = isOut ? -Math.abs(item.quantity) : Math.abs(item.quantity);
+
+                // Update products table (total stock and status)
+                const productUpdateResult = await client.query(
+                    `UPDATE products 
+                     SET stock = stock + $1,
+                         status = CASE 
+                            WHEN stock + $1 <= 0 THEN 'out_of_stock'
+                            WHEN min_stock > 0 AND stock + $1 <= min_stock THEN 'low_stock'
+                            ELSE 'in_stock'
+                         END,
+                         last_movement = CURRENT_DATE,
+                         updated_at = NOW()
+                     WHERE id = $2
+                     RETURNING *`,
+                    [quantityChange, item.product_id]
+                );
+
+                // Update warehouse-specific stock (stock_items) if warehouse_id is provided
+                if (warehouse_id) {
+                    await client.query(
+                        `INSERT INTO stock_items (product_id, warehouse_id, quantity, last_updated)
+                         VALUES ($1, $2, $3, NOW())
+                         ON CONFLICT (product_id, warehouse_id) 
+                         DO UPDATE SET quantity = stock_items.quantity + $3, last_updated = NOW()`,
+                        [item.product_id, warehouse_id, quantityChange]
+                    );
+                }
+
+                // Log movement in history (stock_movements)
+                await client.query(
+                    `INSERT INTO stock_movements (product_id, quantity, type, reference_id, description, created_at)
+                     VALUES ($1, $2, $3, $4, $5, NOW())`,
+                    [
+                        item.product_id,
+                        item.quantity,
+                        movementType,
+                        deliveryNote.id,
+                        `${document_type === 'delivery_note' ? 'Bon de Livraison' : 'Divers'} #${document_id}`
+                    ]
+                );
+            }
         }
 
         await client.query('COMMIT');

@@ -259,7 +259,7 @@ export const Treasury = () => {
   const filteredBankStatementData = bankStatementData.filter(entry => matchesDateFilter(entry.date));
 
   // Create a set of existing invoice document IDs for validation
-  // Treasury payments store document_id (e.g., "INV-01/26/0002") as invoice_id
+  // Treasury payments store document_id (e.g., "FC-01/26/0002") as invoice_id
   const existingInvoiceDocumentIds = useMemo(() => {
     return new Set(allInvoicesData.map(inv => inv.document_id));
   }, [allInvoicesData]);
@@ -284,7 +284,7 @@ export const Treasury = () => {
   });
 
   // Create sets of existing purchase document IDs for validation
-  // Treasury payments store document_id (e.g., "PO-01/26/0001") as invoice_id
+  // Treasury payments store document_id (e.g., "BC-01/26/0001") as invoice_id
   const existingPurchaseOrderDocumentIds = useMemo(() => {
     return new Set(purchaseOrdersData.map(po => po.document_id));
   }, [purchaseOrdersData]);
@@ -1708,7 +1708,7 @@ export const Treasury = () => {
                 <Label htmlFor="invoice">Invoice Number *</Label>
                 <Input
                   id="invoice"
-                  placeholder={paymentType === 'sales' ? 'INV-2024-001' : 'PI-2024-001'}
+                  placeholder={paymentType === 'sales' ? 'FC-01/26/0001' : 'FA-01/26/0001'}
                   value={formInvoiceId}
                   onChange={(e) => setFormInvoiceId(e.target.value)}
                 />

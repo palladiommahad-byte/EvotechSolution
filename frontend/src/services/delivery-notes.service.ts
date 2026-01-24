@@ -20,6 +20,7 @@ export interface DeliveryNote {
   document_id: string;
   client_id: string | null;
   supplier_id: string | null;
+  warehouse_id: string | null;
   date: string;
   subtotal: number;
   status: 'draft' | 'delivered' | 'cancelled';

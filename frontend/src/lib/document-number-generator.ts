@@ -1,34 +1,42 @@
 /**
  * Document Number Generator
  * Generates unique document numbers in the format: PREFIX-MM/YY/NNNN
- * Example: INV-01/26/0001
+ * Example: FC-01/26/0001
  * 
  * Format:
- * - PREFIX: Document type prefix (INV, EST, PO, DN, CN, ST, PI)
+ * - PREFIX: Document type prefix (French abbreviations)
+ *   - FC: Facture Client (Sales Invoice)
+ *   - DV: Devis (Estimate/Quote)
+ *   - BC: Bon de Commande (Purchase Order)
+ *   - BL: Bon de Livraison (Delivery Note)
+ *   - AV: Avoir (Credit Note)
+ *   - RL: Relevé (Statement)
+ *   - FA: Facture Achat (Purchase Invoice)
  * - MM: Month (01-12)
  * - YY: Year (2 digits, e.g., 26 for 2026)
  * - NNNN: Serial number (0001-9999)
  */
 
-export type DocumentType = 
-  | 'invoice'           // INV - Sales Invoice
-  | 'estimate'          // EST - Estimate/Quote
-  | 'purchase_order'    // PO - Purchase Order
-  | 'delivery_note'     // DN - Delivery Note
-  | 'credit_note'       // CN - Credit Note
-  | 'statement'         // ST - Statement
-  | 'purchase_invoice'  // PI - Purchase Invoice
-  | 'divers';           // DIV - Divers/Miscellaneous
+export type DocumentType =
+  | 'invoice'           // FC - Facture Client (Sales Invoice)
+  | 'estimate'          // DV - Devis (Estimate/Quote)
+  | 'purchase_order'    // BC - Bon de Commande (Purchase Order)
+  | 'delivery_note'     // BL - Bon de Livraison (Delivery Note)
+  | 'credit_note'       // AV - Avoir (Credit Note)
+  | 'statement'         // RL - Relevé (Statement)
+  | 'purchase_invoice'  // FA - Facture Achat (Purchase Invoice)
+  | 'divers';           // BL - Bon de Livraison Divers
 
+// French prefixes for all document types
 const DOCUMENT_PREFIXES: Record<DocumentType, string> = {
-  invoice: 'INV',
-  estimate: 'EST',
-  purchase_order: 'PO',
-  delivery_note: 'DN',
-  credit_note: 'CN',
-  statement: 'ST',
-  purchase_invoice: 'PI',
-  divers: 'DIV',
+  invoice: 'INV',           // Sales Invoice (from INV- in DB)
+  estimate: 'EST',          // Estimate (from EST- in DB)
+  purchase_order: 'PO',    // Purchase Order (from PO- in DB)
+  delivery_note: 'DN',     // Delivery Note (from DN- in DB)
+  credit_note: 'AV',       // Credit Note
+  statement: 'RL',         // Relevé
+  purchase_invoice: 'PI',  // Purchase Invoice (from PI- in DB)
+  divers: 'DN',            // Delivery Note Divers (from DN- in DB)
 };
 
 interface DocumentInfo {
@@ -49,7 +57,7 @@ function parseDocumentNumber(documentId: string): {
   // Format: PREFIX-MM/YY/NNNN
   const match = documentId.match(/^([A-Z]+)-(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!match) return null;
-  
+
   return {
     prefix: match[1],
     month: match[2],
@@ -83,16 +91,16 @@ function getNextSerialNumber(
         parsed.month === month &&
         parsed.year === year
     );
-  
+
   if (matchingDocs.length === 0) {
     return 1; // Start from 0001
   }
-  
+
   // Find the highest serial number
   const maxSerial = Math.max(
     ...matchingDocs.map(doc => parseInt(doc.serial, 10))
   );
-  
+
   return maxSerial + 1;
 }
 
@@ -110,7 +118,7 @@ export function generateDocumentNumber(
   documentDate?: Date | string
 ): string {
   const prefix = DOCUMENT_PREFIXES[documentType];
-  
+
   // Get date
   let date: Date;
   if (typeof documentDate === 'string') {
@@ -120,33 +128,33 @@ export function generateDocumentNumber(
   } else {
     date = new Date();
   }
-  
+
   // Format month and year
   const month = String(date.getMonth() + 1).padStart(2, '0'); // 01-12
   const year = String(date.getFullYear()).slice(-2); // Last 2 digits of year
-  
+
   // Get existing document IDs from passed documents only
   // Note: For production, use generateDocumentNumberFromDB from document-number-service.ts
   const existingIds = existingDocuments
     ? existingDocuments.map(doc => doc.id).filter(Boolean) as string[]
     : [];
-  
+
   // Get next serial number
   const serialNumber = getNextSerialNumber(prefix, month, year, existingIds);
-  
+
   // Format serial number with leading zeros
   const serial = String(serialNumber).padStart(4, '0');
-  
+
   // Generate document number
   const documentNumber = `${prefix}-${month}/${year}/${serial}`;
-  
+
   // Verify uniqueness (should never happen, but double-check)
   if (existingIds.includes(documentNumber)) {
     console.warn(`Generated duplicate document number: ${documentNumber}. Trying next number.`);
     // Recursively try next number
     return generateDocumentNumber(documentType, existingDocuments, date);
   }
-  
+
   return documentNumber;
 }
 
@@ -163,10 +171,10 @@ export function isValidDocumentNumber(documentId: string): boolean {
 export function getDocumentTypeFromNumber(documentId: string): DocumentType | null {
   const parsed = parseDocumentNumber(documentId);
   if (!parsed) return null;
-  
+
   const entry = Object.entries(DOCUMENT_PREFIXES).find(
     ([, prefix]) => prefix === parsed.prefix
   );
-  
+
   return entry ? (entry[0] as DocumentType) : null;
 }
