@@ -19,6 +19,7 @@ import {
   Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn, formatDate } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -932,7 +933,7 @@ export const Treasury = () => {
                         {payment.maturityDate ? (
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                            <span className="text-xs">{new Date(payment.maturityDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                            <span className="text-xs">{formatDate(payment.maturityDate)}</span>
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">-</span>
@@ -1052,7 +1053,7 @@ export const Treasury = () => {
                   filteredBankStatementData.slice(0, 10).map((entry) => (
                     <TableRow key={entry.id} className="hover:bg-section/50">
                       <TableCell className="px-2 py-2 text-xs whitespace-nowrap">
-                        {new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        {formatDate(entry.date)}
                       </TableCell>
                       <TableCell className="px-2 py-2 text-xs max-w-[150px] truncate" title={entry.description}>
                         {entry.description}
@@ -1189,7 +1190,7 @@ export const Treasury = () => {
                           {clientName}
                         </TableCell>
                         <TableCell className="px-3 py-3 text-xs whitespace-nowrap">
-                          {new Date(invoice.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          {formatDate(invoice.date)}
                         </TableCell>
                         <TableCell className="px-3 py-3 text-xs text-right font-medium whitespace-nowrap">
                           <CurrencyDisplay amount={invoice.subtotal} />
@@ -1325,7 +1326,7 @@ export const Treasury = () => {
                             {supplierName}
                           </TableCell>
                           <TableCell className="px-3 py-3 text-xs whitespace-nowrap">
-                            {new Date(invoice.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                            {formatDate(invoice.date)}
                           </TableCell>
                           <TableCell className="px-3 py-3 text-xs text-right font-medium whitespace-nowrap">
                             <CurrencyDisplay amount={invoice.subtotal} />
@@ -1414,7 +1415,7 @@ export const Treasury = () => {
                             {supplierName}
                           </TableCell>
                           <TableCell className="px-3 py-3 text-xs whitespace-nowrap">
-                            {new Date(order.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                            {formatDate(order.date)}
                           </TableCell>
                           <TableCell className="px-3 py-3 text-xs text-right font-bold whitespace-nowrap text-danger">
                             <CurrencyDisplay amount={order.subtotal} />

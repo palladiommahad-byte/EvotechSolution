@@ -27,16 +27,16 @@ export type DocumentType =
   | 'purchase_invoice'  // FA - Facture Achat (Purchase Invoice)
   | 'divers';           // BL - Bon de Livraison Divers
 
-// French prefixes for all document types
+// French prefixes for all document types (Moroccan business standards)
 const DOCUMENT_PREFIXES: Record<DocumentType, string> = {
-  invoice: 'INV',           // Sales Invoice (from INV- in DB)
-  estimate: 'EST',          // Estimate (from EST- in DB)
-  purchase_order: 'PO',    // Purchase Order (from PO- in DB)
-  delivery_note: 'DN',     // Delivery Note (from DN- in DB)
-  credit_note: 'AV',       // Credit Note
-  statement: 'RL',         // Relevé
-  purchase_invoice: 'PI',  // Purchase Invoice (from PI- in DB)
-  divers: 'DN',            // Delivery Note Divers (from DN- in DB)
+  invoice: 'FC',           // Facture Client (Sales Invoice)
+  estimate: 'DV',          // Devis (Estimate/Quote)
+  purchase_order: 'BC',    // Bon de Commande (Purchase Order)
+  delivery_note: 'BL',     // Bon de Livraison (Delivery Note)
+  credit_note: 'AV',       // Avoir (Credit Note)
+  statement: 'RL',         // Relevé (Statement)
+  purchase_invoice: 'FA',  // Facture Achat (Purchase Invoice)
+  divers: 'DIV',           // Divers
 };
 
 interface DocumentInfo {

@@ -46,7 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatMAD, VAT_RATE, calculateInvoiceTotals } from '@/lib/moroccan-utils';
 import { ProductSearch } from '@/components/ui/product-search';
@@ -993,7 +993,10 @@ export const Purchases = () => {
 
   const totalPending = purchaseOrders
     .filter(o => o.status === 'pending' || o.status === 'shipped')
-    .reduce((sum, o) => sum + o.total, 0);
+    .reduce((sum, o) => {
+      const amount = typeof o.total === 'number' ? o.total : parseFloat(o.total as any) || 0;
+      return sum + amount;
+    }, 0);
 
   // Purchase Invoice Statistics Calculations
   const purchaseInvoiceStats = {
@@ -1003,27 +1006,27 @@ export const Purchases = () => {
     overdueInvoices: purchaseInvoices.filter(inv => inv.status === 'overdue').length,
     draftInvoices: purchaseInvoices.filter(inv => inv.status === 'draft').length,
     cancelledInvoices: purchaseInvoices.filter(inv => inv.status === 'cancelled').length,
-    totalAmount: purchaseInvoices.reduce((sum, inv) => sum + inv.total, 0),
-    paidAmount: purchaseInvoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.total, 0),
-    unpaidAmount: purchaseInvoices.filter(inv => inv.status !== 'paid' && inv.status !== 'cancelled').reduce((sum, inv) => sum + inv.total, 0),
-    overdueAmount: purchaseInvoices.filter(inv => inv.status === 'overdue').reduce((sum, inv) => sum + inv.total, 0),
+    totalAmount: purchaseInvoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+    paidAmount: purchaseInvoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+    unpaidAmount: purchaseInvoices.filter(inv => inv.status !== 'paid' && inv.status !== 'cancelled').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+    overdueAmount: purchaseInvoices.filter(inv => inv.status === 'overdue').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
     paymentMethodBreakdown: {
-      cash: purchaseInvoices.filter(inv => inv.paymentMethod === 'cash').reduce((sum, inv) => sum + inv.total, 0),
-      check: purchaseInvoices.filter(inv => inv.paymentMethod === 'check').reduce((sum, inv) => sum + inv.total, 0),
-      bank_transfer: purchaseInvoices.filter(inv => inv.paymentMethod === 'bank_transfer').reduce((sum, inv) => sum + inv.total, 0),
+      cash: purchaseInvoices.filter(inv => inv.paymentMethod === 'cash').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+      check: purchaseInvoices.filter(inv => inv.paymentMethod === 'check').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+      bank_transfer: purchaseInvoices.filter(inv => inv.paymentMethod === 'bank_transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
     },
     supplierBreakdown: purchaseInvoices.reduce((acc, inv) => {
       const supplier = inv.supplier;
       if (!acc[supplier]) {
         acc[supplier] = { total: 0, paid: 0, unpaid: 0, count: 0, paidCount: 0, unpaidCount: 0 };
       }
-      acc[supplier].total += inv.total;
+      acc[supplier].total += (Number(inv.total) || 0);
       acc[supplier].count += 1;
       if (inv.status === 'paid') {
-        acc[supplier].paid += inv.total;
+        acc[supplier].paid += (Number(inv.total) || 0);
         acc[supplier].paidCount += 1;
       } else if (inv.status !== 'cancelled') {
-        acc[supplier].unpaid += inv.total;
+        acc[supplier].unpaid += (Number(inv.total) || 0);
         acc[supplier].unpaidCount += 1;
       }
       return acc;
@@ -1459,7 +1462,7 @@ export const Purchases = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{order.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{order.supplier}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{order.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(order.date)}</TableCell>
                             <TableCell className="text-center number-cell">{Array.isArray(order.items) ? order.items.length : 0}</TableCell>
                             <TableCell className="text-right font-medium number-cell">{formatMAD(order.total)}</TableCell>
                             <TableCell className="text-center">
@@ -1861,7 +1864,7 @@ export const Purchases = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{doc.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{doc.supplier}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(doc.date)}</TableCell>
                             <TableCell className="text-center number-cell">{Array.isArray(doc.items) ? doc.items.length : 0}</TableCell>
                             <TableCell className="text-right font-medium number-cell">
                               <CurrencyDisplay amount={doc.total} />
@@ -2345,7 +2348,7 @@ export const Purchases = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{doc.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{doc.supplier}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(doc.date)}</TableCell>
                             <TableCell className="text-center number-cell">{Array.isArray(doc.items) ? doc.items.length : 0}</TableCell>
                             <TableCell className="text-right font-medium number-cell">{formatMAD(doc.total)}</TableCell>
                             <TableCell className="text-center">
@@ -2601,7 +2604,7 @@ export const Purchases = () => {
                         <TableRow key={invoice.id} className="hover:bg-section/50">
                           <TableCell className="font-mono font-medium">{invoice.id}</TableCell>
                           <TableCell>{invoice.supplier}</TableCell>
-                          <TableCell>{invoice.date}</TableCell>
+                          <TableCell>{formatDate(invoice.date)}</TableCell>
                           <TableCell className="text-right font-medium">
                             <CurrencyDisplay amount={invoice.total} />
                           </TableCell>
@@ -2889,7 +2892,7 @@ export const Purchases = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{doc.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{doc.supplier}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(doc.date)}</TableCell>
                             <TableCell className="text-right font-medium number-cell">
                               <CurrencyDisplay amount={doc.total} />
                             </TableCell>
@@ -2974,7 +2977,7 @@ export const Purchases = () => {
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Date</Label>
-                    <p className="font-medium">{viewingDocument.date}</p>
+                    <p className="font-medium">{formatDate(viewingDocument.date)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Items</Label>

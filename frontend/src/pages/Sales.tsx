@@ -47,7 +47,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { ToastAction } from '@/components/ui/toast';
 
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -1013,10 +1013,17 @@ export const Sales = () => {
     }
   };
 
-  const totalRevenue = [...invoices, ...deliveryNotes].reduce((sum, o) => sum + o.total, 0);
+  const totalRevenue = [...invoices, ...deliveryNotes].reduce((sum, o) => {
+    const amount = typeof o.total === 'number' ? o.total : parseFloat(o.total as any) || 0;
+    return sum + amount;
+  }, 0);
+
   const pendingRevenue = invoices
     .filter(o => o.status !== 'paid')
-    .reduce((sum, o) => sum + o.total, 0);
+    .reduce((sum, o) => {
+      const amount = typeof o.total === 'number' ? o.total : parseFloat(o.total as any) || 0;
+      return sum + amount;
+    }, 0);
 
   // Invoice Statistics Calculations
   const invoiceStats = {
@@ -1026,27 +1033,27 @@ export const Sales = () => {
     overdueInvoices: invoices.filter(inv => inv.status === 'overdue').length,
     draftInvoices: invoices.filter(inv => inv.status === 'draft').length,
     cancelledInvoices: invoices.filter(inv => inv.status === 'cancelled').length,
-    totalAmount: invoices.reduce((sum, inv) => sum + inv.total, 0),
-    paidAmount: invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.total, 0),
-    unpaidAmount: invoices.filter(inv => inv.status !== 'paid' && inv.status !== 'cancelled').reduce((sum, inv) => sum + inv.total, 0),
-    overdueAmount: invoices.filter(inv => inv.status === 'overdue').reduce((sum, inv) => sum + inv.total, 0),
+    totalAmount: invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+    paidAmount: invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+    unpaidAmount: invoices.filter(inv => inv.status !== 'paid' && inv.status !== 'cancelled').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+    overdueAmount: invoices.filter(inv => inv.status === 'overdue').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
     paymentMethodBreakdown: {
-      cash: invoices.filter(inv => inv.paymentMethod === 'cash').reduce((sum, inv) => sum + inv.total, 0),
-      check: invoices.filter(inv => inv.paymentMethod === 'check').reduce((sum, inv) => sum + inv.total, 0),
-      bank_transfer: invoices.filter(inv => inv.paymentMethod === 'bank_transfer').reduce((sum, inv) => sum + inv.total, 0),
+      cash: invoices.filter(inv => inv.paymentMethod === 'cash').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+      check: invoices.filter(inv => inv.paymentMethod === 'check').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
+      bank_transfer: invoices.filter(inv => inv.paymentMethod === 'bank_transfer').reduce((sum, inv) => sum + (Number(inv.total) || 0), 0),
     },
     clientBreakdown: invoices.reduce((acc, inv) => {
       const client = inv.client;
       if (!acc[client]) {
         acc[client] = { total: 0, paid: 0, unpaid: 0, count: 0, paidCount: 0, unpaidCount: 0 };
       }
-      acc[client].total += inv.total;
+      acc[client].total += (Number(inv.total) || 0);
       acc[client].count += 1;
       if (inv.status === 'paid') {
-        acc[client].paid += inv.total;
+        acc[client].paid += (Number(inv.total) || 0);
         acc[client].paidCount += 1;
       } else if (inv.status !== 'cancelled') {
-        acc[client].unpaid += inv.total;
+        acc[client].unpaid += (Number(inv.total) || 0);
         acc[client].unpaidCount += 1;
       }
       return acc;
@@ -1516,7 +1523,7 @@ export const Sales = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{doc.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{doc.client}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(doc.date)}</TableCell>
                             <TableCell className="text-center number-cell">
                               {Array.isArray(doc.items) ? doc.items.length : doc.items}
                             </TableCell>
@@ -1924,7 +1931,7 @@ export const Sales = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{formatDocumentId(doc.id, doc.type)}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{getClientDisplayName(doc)}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(doc.date)}</TableCell>
                             <TableCell className="text-right number-cell">
                               {Array.isArray(doc.items) ? doc.items.length : doc.items}
                             </TableCell>
@@ -2335,7 +2342,7 @@ export const Sales = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{doc.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{doc.client}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(doc.date)}</TableCell>
                             <TableCell className="text-center number-cell">
                               {Array.isArray(doc.items) ? doc.items.length : (doc.items ? 1 : 0)}
                             </TableCell>
@@ -2707,7 +2714,7 @@ export const Sales = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{doc.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{doc.client}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(doc.date)}</TableCell>
                             <TableCell className="text-center number-cell">
                               {Array.isArray(doc.items) ? doc.items.length : doc.items}
                             </TableCell>
@@ -3075,7 +3082,7 @@ export const Sales = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{doc.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{doc.client}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(doc.date)}</TableCell>
                             <TableCell className="text-center number-cell">
                               {Array.isArray(doc.items) ? doc.items.length : doc.items}
                             </TableCell>
@@ -3332,7 +3339,7 @@ export const Sales = () => {
                         <TableRow key={invoice.id} className="hover:bg-section/50">
                           <TableCell className="font-mono font-medium">{invoice.id}</TableCell>
                           <TableCell>{invoice.client}</TableCell>
-                          <TableCell>{invoice.date}</TableCell>
+                          <TableCell>{formatDate(invoice.date)}</TableCell>
                           <TableCell className="text-right font-medium">
                             <CurrencyDisplay amount={invoice.total} />
                           </TableCell>
@@ -3620,7 +3627,7 @@ export const Sales = () => {
                             </TableCell>
                             <TableCell className="font-mono font-medium max-w-[120px] truncate">{doc.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{doc.client}</TableCell>
-                            <TableCell className="max-w-[120px] truncate">{doc.date}</TableCell>
+                            <TableCell className="max-w-[120px] truncate">{formatDate(doc.date)}</TableCell>
                             <TableCell className="text-right font-medium number-cell">{formatMAD(doc.total)}</TableCell>
                             <TableCell className="text-center">
                               {renderStatusSelect(doc)}
@@ -3703,7 +3710,7 @@ export const Sales = () => {
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Date</Label>
-                    <p className="font-medium">{viewingDocument.date}</p>
+                    <p className="font-medium">{formatDate(viewingDocument.date)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Items</Label>

@@ -57,7 +57,7 @@ import { useWarehouse, type Warehouse } from '@/contexts/WarehouseContext';
 import { useProducts, Product } from '@/contexts/ProductsContext';
 import { formatMAD } from '@/lib/moroccan-utils';
 import { MapPin, Building2, Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { CurrencyDisplay } from '@/components/ui/CurrencyDisplay';
 import { generateInventoryPDF } from '@/lib/pdf-generator';
 import { generateInventoryExcel } from '@/lib/excel-generator';
@@ -832,7 +832,7 @@ export const Inventory = () => {
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-sm">{t('inventory.lastMovement')}</Label>
-                    <p className="font-medium mt-1">{viewingProduct.lastMovement}</p>
+                    <p className="font-medium mt-1">{formatDate(viewingProduct.lastMovement)}</p>
                   </div>
                 </div>
 
